@@ -1,0 +1,131 @@
+{
+ "features": [
+  "ln(position)",
+  "ln(position) * laps_left/total",
+  "min(gap_to_leader,300)/sqrt(laps_left+1)",
+  "clip(pace_vs_leader,-3,5) * sqrt(laps_left+1)/10",
+  "clip(stops_made - field_median, -2, 2)"
+ ],
+ "coef": [
+  -2.527642973001,
+  1.366692884152,
+  -4.490609492858,
+  -0.602537533194,
+  1.068135333268
+ ],
+ "scaler": {
+  "mean": [
+   2.068692042952,
+   1.067864498392,
+   12.656659843184,
+   0.899527552462,
+   0.045957206622
+  ],
+  "std": [
+   0.794422644948,
+   0.768822128383,
+   17.079944430569,
+   0.988997572644,
+   0.492723473512
+  ]
+ },
+ "lambda": 0.001,
+ "train": {
+  "years": "2011-2022",
+  "races": 239,
+  "groups": 14358,
+  "rows": 269294
+ },
+ "test": {
+  "years": "2023-2026",
+  "races": 90,
+  "groups": 5434,
+  "rows": 101156
+ },
+ "metrics": {
+  "model": {
+   "logloss": 0.693153242,
+   "brier": 0.324303214,
+   "accuracy": 0.785057048
+  },
+  "position": {
+   "logloss": 0.859644816,
+   "brier": 0.39377506,
+   "accuracy": 0.76499816,
+   "coef": -1.997823891,
+   "mean": 2.068692043,
+   "std": 0.794422645
+  },
+  "leader": {
+   "logloss": 3.929637355,
+   "brier": 0.470003185,
+   "accuracy": 0.76499816,
+   "note": "p=1 for the current leader, clipped at 1e-6"
+  },
+  "uniform": {
+   "logloss": 2.918343982,
+   "brier": 0.945573371,
+   "accuracy": 0.054426629,
+   "note": "accuracy is expected random-guess accuracy, mean(1/n)"
+  }
+ },
+ "calibration": [
+  {
+   "p": 0.007288,
+   "obs": 0.004453,
+   "n": 91616
+  },
+  {
+   "p": 0.14329,
+   "obs": 0.149565,
+   "n": 3450
+  },
+  {
+   "p": 0.242373,
+   "obs": 0.398374,
+   "n": 369
+  },
+  {
+   "p": 0.34966,
+   "obs": 0.30137,
+   "n": 292
+  },
+  {
+   "p": 0.451056,
+   "obs": 0.522727,
+   "n": 440
+  },
+  {
+   "p": 0.561059,
+   "obs": 0.596117,
+   "n": 515
+  },
+  {
+   "p": 0.648764,
+   "obs": 0.626836,
+   "n": 1021
+  },
+  {
+   "p": 0.75181,
+   "obs": 0.783333,
+   "n": 1080
+  },
+  {
+   "p": 0.85205,
+   "obs": 0.925981,
+   "n": 1351
+  },
+  {
+   "p": 0.946728,
+   "obs": 0.979452,
+   "n": 1022
+  }
+ ],
+ "defaultSeed": 20261116,
+ "notes": [
+  "Conditional logit, softmax over running cars, one winner per race-lap group.",
+  "Features standardised with training mean/std; L2 1e-3; L-BFGS.",
+  "Gap to leader is cumulative lap-time difference; pit lane time is already in lap times.",
+  "Recent pace uses up to five clean laps; lap noise sd for the undercut is the race regression residual sd."
+ ]
+}

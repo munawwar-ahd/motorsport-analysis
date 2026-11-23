@@ -1,0 +1,1745 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PIT WALL — F1 strategy replay</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000; --panel:#111; --hair:#333; --sec:#888; --tert:#bbb; --fg:#fff;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans:'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+  [data-theme="light"]{
+    --bg:#fff; --panel:#eee; --hair:#ccc; --sec:#777; --tert:#444; --fg:#000;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);max-width:100%;overflow-x:hidden}
+  body{font-family:var(--sans);font-size:13px;line-height:1.55;font-variant-numeric:tabular-nums}
+  ::selection{background:var(--fg);color:var(--bg)}
+  button,select,input{font:inherit;color:inherit}
+  button{background:none;border:0;cursor:pointer}
+  :focus-visible{outline:1px solid var(--fg);outline-offset:2px}
+  a{color:inherit}
+  .mono{font-family:var(--mono)}
+  .panel{background:var(--panel);border:1px solid var(--hair);border-radius:0;min-width:0}
+  .panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 10px;border-bottom:1px solid var(--hair);min-height:35px}
+  .panel-head h2{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--tert);margin:0;white-space:nowrap}
+  .tag{font-family:var(--mono);font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:var(--sec);white-space:nowrap}
+  .panel-note{padding:7px 10px;border-top:1px solid var(--hair);font-size:10px;line-height:1.5;color:var(--sec)}
+  .panel-note b{font-weight:500;color:var(--tert)}
+
+  header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--hair)}
+  .topbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 16px;padding:8px}
+  .brand-block{min-width:176px;flex:0 0 auto}
+  .brand{font-family:var(--mono);font-size:14px;font-weight:600;letter-spacing:.2em;line-height:1.2}
+  .sub{display:block;font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:var(--sec);text-transform:uppercase;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .selectors{display:flex;gap:8px;flex:1 1 280px;min-width:0;max-width:460px}
+  .sel{display:flex;flex-direction:column;gap:3px;min-width:0;position:relative}
+  .sel::after{content:'▾';position:absolute;right:8px;bottom:5px;color:var(--sec);font-family:var(--mono);font-size:9px;line-height:1;pointer-events:none}
+  .sel.season{flex:0 0 88px}
+  .sel.race{flex:1 1 auto}
+  .sel span{font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:var(--sec);text-transform:uppercase}
+  select{appearance:none;-webkit-appearance:none;width:100%;min-width:0;background:var(--bg);border:1px solid var(--hair);border-radius:0;padding:5px 22px 5px 7px;font-family:var(--mono);font-size:10px;line-height:1.3;color:var(--fg);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+  select:hover{border-color:var(--sec)}
+  .transport{display:flex;flex-wrap:wrap;align-items:center;gap:4px;flex:0 0 auto}
+  .btn{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--hair);border-radius:0;padding:5px 7px;line-height:1.2;color:var(--tert);background:transparent;white-space:nowrap}
+  .btn:hover{border-color:var(--fg);color:var(--fg)}
+  .btn.primary{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+  .btn.primary:hover{background:var(--fg);color:var(--bg)}
+  .btn.active{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+  .btn:disabled{opacity:.35;cursor:not-allowed}
+  .speeds{display:flex;gap:0}
+  .speeds .btn{border-right:0;padding:5px 6px}
+  .speeds .btn:last-child{border-right:1px solid var(--hair)}
+  .scrubrow{display:flex;align-items:center;gap:10px;padding:0 8px 8px}
+  .scrubrow input[type=range]{flex:1 1 auto;min-width:0}
+  .lapcount{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--tert);white-space:nowrap}
+  .lapcount #lapNow{font-weight:500;color:var(--fg)}
+  .hint{font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--sec);white-space:nowrap}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent;cursor:pointer;margin:0;padding:0}
+  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--hair)}
+  input[type=range]::-moz-range-track{height:1px;background:var(--hair)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:8px;height:8px;background:var(--fg);border:0;border-radius:0;margin-top:-3.5px}
+  input[type=range]::-moz-range-thumb{width:8px;height:8px;background:var(--fg);border:0;border-radius:0}
+  input[type=range]:disabled{opacity:.35;cursor:not-allowed}
+  button:focus-visible,select:focus-visible,input:focus-visible,tr:focus-visible,[tabindex]:focus-visible{outline:1px solid var(--fg);outline-offset:1px}
+
+  [hidden]{display:none!important}
+  main{display:grid;grid-template-columns:330px minmax(0,1fr) 340px;gap:8px;padding:8px;align-items:start}
+  .col{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+  .chart{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .chart-wrap{height:212px;padding:0 2px;min-width:0}
+  .chart.wide .chart-wrap{height:236px}
+  .chart-wrap svg{display:block;width:100%;height:100%}
+  .chart .panel-note{padding-top:6px;padding-bottom:6px}
+  .chart .panel-note .n{color:var(--tert)}
+
+  .tower-wrap{max-height:528px;overflow-y:auto;overflow-x:hidden}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  .tower th{font-family:var(--mono);font-size:8px;font-weight:400;letter-spacing:.07em;text-transform:uppercase;color:var(--sec);text-align:right;padding:6px 6px 5px;border-bottom:1px solid var(--hair);white-space:nowrap}
+  .tower th:first-child,.tower th:nth-child(2){text-align:left}
+  .tower td{font-family:var(--mono);font-size:10px;padding:4px 6px;height:25px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--bg)}
+  .tower td:first-child,.tower td:nth-child(2){text-align:left}
+  .tower tr{cursor:pointer}
+  .tower tr:hover td{background:var(--bg)}
+  .tower tr.focus td{background:var(--bg);border-top:1px solid var(--fg);border-bottom:1px solid var(--fg)}
+  .tower tr.focus td:first-child{border-left:2px solid var(--fg);padding-left:4px}
+  .tower tr.focus td:last-child{border-right:1px solid var(--fg)}
+  .tower tr.focus .code{font-weight:600}
+  .tower .code{font-size:10px;letter-spacing:.02em}
+  .tower .p{color:var(--sec)}
+  .tower .win{color:var(--fg)}
+  .tower .gap{color:var(--fg)}
+  .tower .dim{color:var(--sec)}
+  .tower .tyre{color:var(--tert)}
+  .tower col.c-p{width:26px}.tower col.c-code{width:44px}.tower col.c-gap{width:58px}.tower col.c-int{width:48px}.tower col.c-last{width:60px}.tower col.c-tyre{width:36px}.tower col.c-win{width:46px}
+  .tower-foot{padding:7px 10px;font-size:9px;line-height:1.5;color:var(--sec);border-top:1px solid var(--hair)}
+  .tower-foot b{font-weight:500;color:var(--tert)}
+
+  .feed-wrap{max-height:390px;overflow-y:auto}
+  .feed{display:flex;flex-direction:column}
+  .feed-item{display:grid;grid-template-columns:30px 54px minmax(0,1fr);gap:6px;padding:5px 10px;border-bottom:1px solid var(--bg);font-family:var(--mono);font-size:9px;line-height:1.45;align-items:baseline}
+  .feed-item:last-child{border-bottom:0}
+  .feed-lap{color:var(--sec);text-align:right}
+  .feed-type{font-size:8px;letter-spacing:.06em;color:var(--tert);white-space:nowrap}
+  .feed-text{color:var(--fg);min-width:0;overflow-wrap:anywhere}
+  .feed-text .muted{color:var(--sec)}
+  .feed-item.lead .feed-type,.feed-item.out .feed-type{color:var(--fg)}
+  .feed-item.neutral .feed-text{color:var(--tert)}
+
+  .prob-bars{padding:6px 10px 4px;display:flex;flex-direction:column;gap:1px}
+  .prob-row{display:grid;grid-template-columns:32px minmax(0,1fr) 42px;align-items:center;gap:6px;height:18px;padding:0 2px}
+  .prob-row .code{font-family:var(--mono);font-size:9px;color:var(--tert);white-space:nowrap}
+  .prob-track{height:6px;background:var(--bg);border:1px solid var(--hair);position:relative;min-width:0}
+  .prob-fill{height:4px;background:var(--hair);margin-top:0;min-width:0}
+  .prob-row.other .prob-fill{background:var(--sec);opacity:.7}
+  .prob-row.focus .prob-fill{background:var(--fg);opacity:1}
+  .prob-row.ahead .prob-track{border:1px dashed var(--fg)}
+  .prob-row.ahead .prob-fill{background:var(--tert)}
+  .prob-row.focus .code,.prob-row.ahead .code{color:var(--fg)}
+  .prob-row .pct{font-family:var(--mono);font-size:10px;text-align:right;color:var(--tert)}
+  .prob-row.focus .pct{color:var(--fg);font-weight:500}
+  .prob-note{padding:4px 10px 8px;font-size:9px;line-height:1.5;color:var(--sec);border-top:1px solid var(--hair)}
+
+  .uc-body{padding:8px 10px}
+  .uc-top{display:grid;grid-template-columns:1fr 92px;gap:8px;align-items:stretch}
+  .verdict{display:flex;flex-direction:column;justify-content:center;padding:7px 9px;font-family:var(--mono);font-size:12px;letter-spacing:.09em;text-transform:uppercase;line-height:1.2;min-height:46px}
+  .verdict.box{background:var(--fg);color:var(--bg);font-weight:600;border:1px solid var(--fg)}
+  .verdict.marginal{border:1px solid var(--fg);color:var(--fg);font-weight:500}
+  .verdict.stay{border:1px solid transparent;color:var(--sec);font-weight:400}
+  .verdict .vsub{display:block;font-size:7px;letter-spacing:.05em;margin-top:3px;font-weight:400;color:inherit;opacity:.65;text-transform:none}
+  .uc-prob{text-align:right;display:flex;flex-direction:column;justify-content:center;gap:1px}
+  .uc-prob .big{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1.05;letter-spacing:-.02em}
+  .uc-prob .lbl{font-family:var(--mono);font-size:7px;letter-spacing:.06em;color:var(--sec);text-transform:uppercase;line-height:1.3}
+  .uc-readout{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:8px;padding-top:8px;border-top:1px solid var(--hair)}
+  .uc-readout div{min-width:0}
+  .uc-readout span{display:block;font-family:var(--mono);font-size:7px;letter-spacing:.05em;color:var(--sec);text-transform:uppercase}
+  .uc-readout b{display:block;font-family:var(--mono);font-size:11px;font-weight:400;color:var(--fg);white-space:nowrap}
+  .sliders{margin-top:8px;padding-top:6px;border-top:1px solid var(--hair);display:flex;flex-direction:column;gap:5px}
+  .slider-row{display:grid;grid-template-columns:1fr auto;gap:0 8px;align-items:center}
+  .slider-row .sl{font-family:var(--mono);font-size:8px;letter-spacing:.05em;color:var(--sec);text-transform:uppercase;white-space:nowrap}
+  .slider-row .sv{font-family:var(--mono);font-size:9px;color:var(--tert);white-space:nowrap}
+  .slider-row input{grid-column:1/-1;width:100%}
+  .uc-actions{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
+  .uc-actions .btn{padding:4px 6px;font-size:8px}
+  .uc-source{font-size:9px;color:var(--sec);line-height:1.45;min-width:0}
+  .uc-curve{height:104px;margin-top:6px;border-top:1px solid var(--hair);padding-top:2px}
+  .uc-curve svg{display:block;width:100%;height:100%}
+  .uc-estimate{padding:7px 10px;border-top:1px solid var(--hair);font-size:9px;line-height:1.5;color:var(--sec)}
+  .uc-estimate b{font-weight:500;color:var(--tert)}
+
+  .evidence{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 8px 8px;align-items:start}
+  .ev{display:flex;flex-direction:column;min-width:0}
+  .ev-chart{padding:4px 2px 0;min-width:0}
+  .ev-chart svg{display:block;width:100%;height:100%}
+  .ev-note{padding:7px 10px;border-top:1px solid var(--hair);font-size:9px;line-height:1.5;color:var(--sec)}
+  .ev-note b{font-weight:500;color:var(--tert)}
+  .model-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(140px,.85fr);gap:8px;padding:8px 10px 0;align-items:start}
+  .model-table{width:100%;border-collapse:collapse;table-layout:fixed}
+  .model-table th{font-family:var(--mono);font-size:7px;font-weight:400;letter-spacing:.05em;color:var(--sec);text-transform:uppercase;text-align:right;padding:0 3px 4px;border-bottom:1px solid var(--hair);white-space:nowrap}
+  .model-table th:first-child{text-align:left}
+  .model-table td{font-family:var(--mono);font-size:9px;text-align:right;padding:4px 3px;border-bottom:1px solid var(--bg);white-space:nowrap}
+  .model-table td:first-child{text-align:left;color:var(--tert)}
+  .model-table tr.best td{color:var(--fg);font-weight:600}
+  .model-table tr.best td:first-child{color:var(--fg)}
+  .model-table .sub{font-size:7px;color:var(--sec);font-weight:400;display:block;letter-spacing:0}
+  .cal-wrap{height:156px;min-width:0}
+  .cal-wrap svg{display:block;width:100%;height:100%}
+  .model-meta{padding:7px 10px;border-top:1px solid var(--hair);font-size:9px;line-height:1.5;color:var(--sec)}
+  .model-meta b{font-weight:500;color:var(--tert)}
+
+  footer{border-top:1px solid var(--hair);padding:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;color:var(--sec);font-size:10px;line-height:1.55}
+  footer b{font-family:var(--mono);font-size:8px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--tert);display:block;margin-bottom:2px}
+  .boot{display:flex;align-items:center;justify-content:center;min-height:60vh;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--sec);text-align:center;padding:24px}
+  .boot .err{color:var(--fg);max-width:520px;line-height:1.6}
+
+  svg text{font-variant-numeric:tabular-nums}
+  .grid-line{stroke:var(--hair);stroke-width:1;shape-rendering:crispEdges}
+  .axis-label{fill:var(--sec);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
+  .axis-label-strong{fill:var(--tert);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
+  .neutral-band{fill:var(--hair);opacity:.55}
+  .neutral-text{fill:var(--sec);font-family:var(--mono);font-size:6.5px;letter-spacing:.06em}
+  .series-other{fill:none;stroke:var(--sec);stroke-width:1;opacity:.42;stroke-linejoin:round;stroke-linecap:round}
+  .series-focus{fill:none;stroke:var(--fg);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+  .series-ahead{fill:none;stroke:var(--fg);stroke-width:1.7;stroke-dasharray:5 4;stroke-linejoin:round;stroke-linecap:round}
+  .series-label{fill:var(--fg);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
+  .series-label-muted{fill:var(--sec);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
+  .ols-line{fill:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:2 3;opacity:.8}
+  .now-line{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
+  .now-label{fill:var(--sec);font-family:var(--mono);font-size:7px;letter-spacing:.04em}
+  .stint-other-even{fill:var(--hair)}
+  .stint-other-odd{fill:var(--sec);opacity:.6}
+  .stint-focus{fill:var(--fg)}
+  .stint-ahead{fill:var(--tert);opacity:.75}
+  .pit-tick{stroke:var(--fg);stroke-width:1}
+  .pit-tick-muted{stroke:var(--tert);stroke-width:1;opacity:.75}
+  .cal-diag{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
+  .cal-line{fill:none;stroke:var(--fg);stroke-width:1}
+  .cal-dot{fill:var(--fg)}
+  .bar-fill{fill:var(--sec)}
+  .bar-fill-focus{fill:var(--fg)}
+  .bar-hollow{fill:none;stroke:var(--sec);stroke-width:1}
+  .bar-hollow-focus{fill:none;stroke:var(--fg);stroke-width:1.5}
+  .iqr{stroke:var(--tert);stroke-width:1}
+  .iqr-focus{stroke:var(--fg);stroke-width:1.5}
+  .fallback-line{stroke:var(--tert);stroke-width:1;stroke-dasharray:4 3}
+  .verdict-line{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
+  .uc-dot{fill:var(--fg)}
+
+  @media (max-width:1180px){
+    main{grid-template-columns:330px minmax(0,1fr)}
+    .col.right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;align-items:start}
+    .evidence{grid-template-columns:1fr}
+    .topbar{gap:8px 12px}
+  }
+  @media (max-width:860px){
+    main{grid-template-columns:1fr}
+    .col.right{grid-column:auto;display:flex;flex-direction:column}
+    .chart-grid{grid-template-columns:1fr 1fr}
+    .tower-wrap{max-height:360px}
+    .feed-wrap{max-height:320px}
+    .evidence{grid-template-columns:1fr}
+  }
+  @media (max-width:700px){
+    .chart-grid{grid-template-columns:1fr}
+    .brand-block{min-width:0;flex:1 1 100%}
+    .selectors{max-width:none;flex:1 1 100%}
+    .transport{flex:1 1 100%;justify-content:flex-start}
+    .hint{display:none}
+    footer{grid-template-columns:1fr;gap:8px}
+    .model-grid{grid-template-columns:1fr}
+    .cal-wrap{height:180px}
+    .uc-top{grid-template-columns:1fr 84px}
+  }
+  @media (max-width:560px){
+    .tower .code{font-size:10px}
+    .feed-item{grid-template-columns:26px 48px minmax(0,1fr);padding-left:8px;padding-right:8px}
+    .topbar{padding:8px 8px 4px}
+    .scrubrow{padding:0 8px 8px}
+    .brand{font-size:13px}
+  }
+  @media (max-width:400px){
+    main{padding:6px}
+    .evidence{padding:0 6px 6px}
+    footer{padding:8px 6px}
+    .uc-body{padding:8px}
+    .prob-bars{padding-left:8px;padding-right:8px}
+    .tower td,.tower th{padding-left:4px;padding-right:4px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand-block">
+      <div class="brand">PIT WALL</div>
+      <div class="sub">F1 strategy replay · <span id="metaLine">loading</span></div>
+    </div>
+    <div class="selectors">
+      <label class="sel season"><span>SEASON</span><select id="seasonSel" aria-label="Season"></select></label>
+      <label class="sel race"><span>RACE</span><select id="raceSel" aria-label="Race"></select></label>
+    </div>
+    <div class="transport">
+      <button id="prevBtn" class="btn" title="Previous lap (left arrow)">PREV</button>
+      <button id="playBtn" class="btn primary" title="Play or pause (space)">PLAY</button>
+      <button id="nextBtn" class="btn" title="Next lap (right arrow)">NEXT</button>
+      <div class="speeds" role="group" aria-label="Replay speed">
+        <button class="btn speed active" data-speed="1">1x</button>
+        <button class="btn speed" data-speed="2">2x</button>
+        <button class="btn speed" data-speed="4">4x</button>
+        <button class="btn speed" data-speed="8">8x</button>
+      </div>
+      <button id="themeBtn" class="btn" title="Toggle light or dark theme">LIGHT</button>
+    </div>
+  </div>
+  <div class="scrubrow">
+    <input id="scrub" type="range" min="1" max="2" value="1" step="1" aria-label="Replay lap">
+    <div class="lapcount"><span id="lapNow">1</span> / <span id="lapTotal">1</span></div>
+    <div class="hint">← → STEP · SPACE PLAY</div>
+  </div>
+</header>
+
+<div id="boot" class="boot">LOADING DATA</div>
+
+<main id="main" hidden>
+  <aside class="col left">
+    <section class="panel">
+      <div class="panel-head"><h2>Timing tower</h2><span class="tag" id="towerMeta">LAP —</span></div>
+      <div class="tower-wrap">
+        <table class="tower">
+          <colgroup><col class="c-p"><col class="c-code"><col class="c-gap"><col class="c-int"><col class="c-last"><col class="c-tyre"><col class="c-win"></colgroup>
+          <thead><tr><th>P</th><th>Driver</th><th>Gap</th><th>Int</th><th>Last</th><th>Tyre</th><th>Win %</th></tr></thead>
+          <tbody id="towerBody"></tbody>
+        </table>
+      </div>
+      <div class="tower-foot" id="towerNote"></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>Race feed</h2><span class="tag" id="feedMeta">LAP —</span></div>
+      <div class="feed-wrap"><div class="feed" id="feed"></div></div>
+      <div class="panel-note">Neutralised periods are inferred from field-median lap times; the source data has no flag type.</div>
+    </section>
+  </aside>
+
+  <section class="col centre">
+    <div class="chart-grid">
+      <figure class="panel chart" id="figLap">
+        <div class="panel-head"><h2>Lap chart</h2><span class="tag" id="lapChartTag">POSITION</span></div>
+        <div class="chart-wrap" id="lapChartWrap"></div>
+        <div class="panel-note">On-track position, lap 1 to now. <span class="n" id="lapChartNote"></span></div>
+      </figure>
+      <figure class="panel chart" id="figGap">
+        <div class="panel-head"><h2>Gap to leader</h2><span class="tag" id="gapChartTag">SECONDS</span></div>
+        <div class="chart-wrap" id="gapChartWrap"></div>
+        <div class="panel-note">Cumulative lap-time difference. Pit lane time is inside the lap times. <span class="n" id="gapChartNote"></span></div>
+      </figure>
+      <figure class="panel chart" id="figPace">
+        <div class="panel-head"><h2>Pace</h2><span class="tag" id="paceChartTag">FOCUS VS AHEAD</span></div>
+        <div class="chart-wrap" id="paceChartWrap"></div>
+        <div class="panel-note">Clean laps only. Dotted line is the focus car's current-stint OLS: lap time against tyre age. <span class="n" id="paceChartNote"></span></div>
+      </figure>
+      <figure class="panel chart" id="figStrategy">
+        <div class="panel-head"><h2>Strategy timeline</h2><span class="tag" id="strategyChartTag">STINTS</span></div>
+        <div class="chart-wrap" id="strategyChartWrap"></div>
+        <div class="panel-note">Stints alternate grey; vertical ticks are pit stops. Compounds are not in the data.</div>
+      </figure>
+    </div>
+    <figure class="panel chart wide" id="figProb">
+      <div class="panel-head"><h2>Win probability trace</h2><span class="tag" id="probChartTag">CONDITIONAL LOGIT</span></div>
+      <div class="chart-wrap" id="probChartWrap"></div>
+      <div class="panel-note">Probability over running cars. The model ignores future pit stops, so odds wobble in pit cycles. <span class="n" id="probChartNote"></span></div>
+    </figure>
+  </section>
+
+  <aside class="col right">
+    <section class="panel">
+      <div class="panel-head"><h2>Win probability</h2><span class="tag" id="probMeta">LAP —</span></div>
+      <div class="prob-bars" id="probBars"></div>
+      <div class="prob-note" id="probNote">Focus is solid. The car ahead is a dashed outline; if the focus leads, P2 is the threat.</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Undercut</h2><span class="tag" id="ucRoles">—</span></div>
+      <div class="uc-body">
+        <div class="uc-top">
+          <div class="verdict stay" id="ucVerdict">STAY OUT<span class="vsub" id="ucVerdictSub"></span></div>
+          <div class="uc-prob"><span class="big" id="ucP">—</span><span class="lbl" id="ucPLabel">P(CHASER AHEAD)</span></div>
+        </div>
+        <div class="uc-readout">
+          <div><span>Median margin</span><b id="ucMed">—</b></div>
+          <div><span>10–90%</span><b id="ucRange">—</b></div>
+          <div><span>Break-even gap</span><b id="ucBE">—</b></div>
+          <div><span>Mean tyre gain</span><b id="ucAdv">—</b></div>
+        </div>
+        <div class="sliders">
+          <label class="slider-row"><span class="sl">Gap to car ahead</span><span class="sv" id="ucGapVal">—</span><input id="ucGap" type="range" min="0" max="60" step="0.1" aria-label="Gap in seconds"></label>
+          <label class="slider-row"><span class="sl">Pit loss</span><span class="sv" id="ucPitVal">—</span><input id="ucPit" type="range" min="5" max="45" step="0.1" aria-label="Pit loss in seconds"></label>
+          <label class="slider-row"><span class="sl">Tyre wear</span><span class="sv" id="ucWearVal">—</span><input id="ucWear" type="range" min="0" max="0.2" step="0.001" aria-label="Tyre wear in seconds per lap"></label>
+          <label class="slider-row"><span class="sl">Ahead tyre age</span><span class="sv" id="ucAgeVal">—</span><input id="ucAge" type="range" min="1" max="45" step="1" aria-label="Tyre age of the car ahead"></label>
+          <label class="slider-row"><span class="sl">k laps</span><span class="sv" id="ucKVal">—</span><input id="ucK" type="range" min="1" max="10" step="1" aria-label="Laps the car ahead stays out"></label>
+          <label class="slider-row"><span class="sl">Traffic cost (chaser)</span><span class="sv" id="ucTrafficVal">—</span><input id="ucTraffic" type="range" min="0" max="5" step="0.1" aria-label="Traffic cost in seconds"></label>
+        </div>
+        <div class="uc-actions">
+          <button class="btn" id="ucReset">Reset to live</button>
+          <span class="uc-source" id="ucSource"></span>
+        </div>
+        <div class="uc-curve"><svg id="ucCurve" role="img" aria-label="Probability the chaser is ahead after both stops, versus current gap"></svg></div>
+      </div>
+      <div class="uc-estimate" id="ucEstimate">Estimate. Waiting for a live car pair.</div>
+    </section>
+  </aside>
+</main>
+
+<section class="evidence" id="evidence" hidden>
+  <article class="panel ev" id="evPit">
+    <div class="panel-head"><h2>Pit loss by circuit</h2><span class="tag" id="pitCardTag">IQR · N≥15</span></div>
+    <div class="ev-chart" id="pitChart"></div>
+    <div class="ev-note" id="pitCardNote"></div>
+  </article>
+  <article class="panel ev" id="evWear">
+    <div class="panel-head"><h2>Tyre wear by round</h2><span class="tag" id="wearCardTag">S/LAP · R²</span></div>
+    <div class="ev-chart" id="wearChart" style="height:236px"></div>
+    <div class="ev-note" id="wearCardNote"></div>
+  </article>
+  <article class="panel ev" id="evModel">
+    <div class="panel-head"><h2>Win model</h2><span class="tag" id="modelCardTag">HELD-OUT</span></div>
+    <div class="model-grid">
+      <table class="model-table">
+        <thead><tr><th>Model</th><th>Log loss</th><th>Brier</th><th>Acc</th></tr></thead>
+        <tbody id="modelRows"></tbody>
+      </table>
+      <div class="cal-wrap"><svg id="calChart" role="img" aria-label="Calibration plot"></svg></div>
+    </div>
+    <div class="model-meta" id="modelNote"></div>
+  </article>
+</section>
+
+<footer id="footer" hidden>
+  <div><b>Data</b><span id="footData"></span></div>
+  <div><b>What is not in the data</b>Tyre compounds and weather are absent. Stints and tyre age come from pit stops; neutralised laps come from field-median lap times. The source has no flag type, so the page never claims safety car, VSC or red flag.</div>
+  <div><b>Model limits</b>The win model is a conditional logit over running cars. It ignores future pit stops, so odds wobble in pit cycles. It does not model retirements, weather, tyre compounds or race control. Pit loss and tyre wear are estimates; n and within R² are shown where they are used.</div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const median = (arr) => {
+  if (!arr.length) return NaN;
+  const a = arr.slice().sort((x, y) => x - y);
+  const n = a.length;
+  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+};
+const quantile = (sorted, p) => {
+  if (!sorted.length) return NaN;
+  const pos = (sorted.length - 1) * p;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+};
+const fmtLap = (ms) => {
+  if (ms == null || !isFinite(ms)) return '—';
+  const m = Math.floor(ms / 60000);
+  const s = (ms % 60000) / 1000;
+  return `${m}:${s.toFixed(3).padStart(6, '0')}`;
+};
+const fmtSigned = (x, nd = 2) => {
+  if (!isFinite(x)) return '—';
+  return `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(nd)}`;
+};
+const fmtSec = (x, nd = 2) => isFinite(x) ? `${x.toFixed(nd)} s` : '—';
+const fmtPct = (x) => isFinite(x) ? `${(x * 100).toFixed(1)}` : '—';
+const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+const state = {
+  index: null,
+  model: null,
+  seasonCache: new Map(),
+  year: null,
+  raceId: null,
+  season: null,
+  race: null,
+  sim: null,
+  lap: 1,
+  focusId: null,
+  aheadId: null,
+  playing: false,
+  speed: 1,
+  timer: null,
+  uc: { dirty: false, live: null, params: null, result: null },
+  theme: 'dark',
+  evidenceDirty: true,
+  resizeQueued: false,
+};
+
+function svgEl(tag, attrs = {}, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue;
+    e.setAttribute(k, v);
+  }
+  if (text != null) e.textContent = text;
+  return e;
+}
+function add(parent, ...children) {
+  for (const c of children) if (c) parent.appendChild(c);
+  return parent;
+}
+function clearSvg(container) {
+  const w = Math.max(140, Math.floor(container.clientWidth || 300));
+  const h = Math.max(100, Math.floor(container.clientHeight || 180));
+  let svg = container.querySelector('svg');
+  if (!svg) {
+    svg = svgEl('svg');
+    container.appendChild(svg);
+  }
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  return { svg, w, h };
+}
+function makePlot(w, h, m) {
+  return { x: m.l, y: m.t, w: Math.max(20, w - m.l - m.r), h: Math.max(20, h - m.t - m.b) };
+}
+function xScale(plot, n) {
+  return (lap) => plot.x + (n <= 1 ? plot.w / 2 : (lap - 1) / (n - 1) * plot.w);
+}
+function drawGrid(svg, plot, xTicks, yTicks, x, y, labels = true) {
+  for (const t of yTicks) {
+    const yy = y(t.value);
+    add(svg, svgEl('line', { class: 'grid-line', x1: plot.x, x2: plot.x + plot.w, y1: yy, y2: yy }));
+    if (labels) add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 5, y: yy + 2.5, 'text-anchor': 'end' }, t.label));
+  }
+  for (const t of xTicks) {
+    const xx = x(t.value);
+    add(svg, svgEl('line', { class: 'grid-line', x1: xx, x2: xx, y1: plot.y, y2: plot.y + plot.h }));
+    if (t.label) add(svg, svgEl('text', { class: 'axis-label', x: xx, y: plot.y + plot.h + 12, 'text-anchor': 'middle' }, t.label));
+  }
+}
+function drawNeutral(svg, sim, plot, x, label = true) {
+  if (!sim.neutralGroups.length) return;
+  let labelled = !label;
+  for (const [a, b] of sim.neutralGroups) {
+    if (a > state.lap) continue;
+    const aa = Math.max(1, a), bb = Math.min(state.lap, b);
+    if (bb < 1) continue;
+    const x1 = Math.max(plot.x, x(aa - 0.5));
+    const x2 = Math.min(plot.x + plot.w, x(bb + 0.5));
+    if (x2 <= x1) continue;
+    add(svg, svgEl('rect', { class: 'neutral-band', x: x1, y: plot.y, width: x2 - x1, height: plot.h }));
+    if (!labelled && x2 - x1 > 42) {
+      add(svg, svgEl('text', { class: 'neutral-text', x: x1 + 3, y: plot.y + 8 }, 'NEUTRAL'));
+      labelled = true;
+    }
+  }
+}
+function drawNow(svg, plot, x, h) {
+  const xx = x(state.lap);
+  add(svg, svgEl('line', { class: 'now-line', x1: xx, x2: xx, y1: plot.y, y2: plot.y + plot.h }));
+  add(svg, svgEl('text', { class: 'now-label', x: xx - 3, y: plot.y - 4, 'text-anchor': 'end' }, `L${state.lap}`));
+}
+function placeLabels(labels, minGap, top, bottom) {
+  labels.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) {
+    if (labels[i].y - labels[i - 1].y < minGap) labels[i].y = labels[i - 1].y + minGap;
+  }
+  for (let i = labels.length - 1; i >= 0; i--) {
+    if (i === labels.length - 1 && labels[i].y > bottom) labels[i].y = bottom;
+    if (i < labels.length - 1 && labels[i].y > labels[i + 1].y - minGap) labels[i].y = labels[i + 1].y - minGap;
+  }
+  for (const l of labels) l.y = clamp(l.y, top, bottom);
+  return labels;
+}
+function pathFor(pts) {
+  if (!pts.length) return '';
+  return pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
+}
+function runningDrivers(sim, lap) {
+  return sim.drivers.filter((d) => lap >= 1 && lap <= d.lastLap);
+}
+function byPosition(drivers) {
+  return drivers.slice().sort((a, b) => (a.pos[a.lastLap - 1] == null ? 999 : a.pos[Math.min(state.lap, a.lastLap) - 1]) - (b.pos[b.lastLap - 1] == null ? 999 : b.pos[Math.min(state.lap, b.lastLap) - 1]) || a.id - b.id);
+}
+function orderAt(sim, lap) {
+  return runningDrivers(sim, lap).sort((a, b) => {
+    const pa = a.pos[lap - 1], pb = b.pos[lap - 1];
+    return (pa == null ? 999 : pa) - (pb == null ? 999 : pb) || a.id - b.id;
+  });
+}
+function leaderAt(sim, lap) {
+  const o = orderAt(sim, lap);
+  return o.length ? o[0] : null;
+}
+function driverById(sim, id) {
+  return sim.drivers.find((d) => d.id === id) || null;
+}
+function isClean(d, lap) {
+  return lap >= 2 && lap <= d.lastLap && !state.sim.neutralSet.has(lap) && !d.inOut.has(lap);
+}
+function ageAt(d, lap) {
+  return d.age[lap] == null ? null : d.age[lap];
+}
+function recentPace(d, lap) {
+  return d.pace[lap] == null ? NaN : d.pace[lap];
+}
+
+function computeSim(race, season) {
+  const total = race.laps;
+  const neutralSet = new Set(race.neutral || []);
+  const drivers = (race.drivers || []).map((raw) => {
+    const id = raw.id;
+    const meta = season.drivers[String(id)] || { code: '???', name: `Driver ${id}` };
+    const laps = raw.laps.slice();
+    const pos = raw.pos.slice();
+    const lastLap = laps.length;
+    const pits = (raw.pits || []).slice().sort((a, b) => a[0] - b[0]);
+    const inOut = new Set();
+    const pitByLap = new Map();
+    for (const [lap, lane] of pits) {
+      inOut.add(lap);
+      inOut.add(lap + 1);
+      if (!pitByLap.has(lap)) pitByLap.set(lap, []);
+      pitByLap.get(lap).push(lane);
+    }
+    const cum = new Array(total + 1).fill(NaN);
+    cum[0] = 0;
+    for (let l = 1; l <= lastLap; l++) cum[l] = cum[l - 1] + laps[l - 1];
+    const stopsBefore = new Array(total + 1).fill(0);
+    for (let l = 1; l <= total; l++) {
+      let c = 0;
+      for (const [pl] of pits) { if (pl < l) c++; else break; }
+      stopsBefore[l] = c;
+    }
+    const starts = [1].concat(pits.filter(([l]) => l >= 1 && l < lastLap).map(([l]) => l + 1));
+    const ends = pits.filter(([l]) => l >= 1 && l < lastLap).map(([l]) => l).concat([lastLap]);
+    const age = new Array(total + 1).fill(null);
+    for (let s = 0; s < starts.length; s++) {
+      for (let l = starts[s]; l <= Math.min(ends[s], lastLap); l++) age[l] = l - starts[s] + 1;
+    }
+    const stints = [];
+    let st = 1;
+    for (const [pl] of pits) {
+      if (pl >= st && pl <= lastLap) { stints.push([st, pl]); st = pl + 1; }
+    }
+    if (st <= lastLap) stints.push([st, lastLap]);
+    const lapAges = new Array(total + 1).fill(null);
+    for (let l = 1; l <= lastLap; l++) lapAges[l] = age[l];
+    return {
+      id, meta, laps, pos, lastLap, pits, inOut, pitByLap,
+      cum, stopsBefore, age: lapAges, stints,
+      team: raw.team, noResult: !!raw.noResult, teamSource: raw.teamSource || 'results',
+      result: raw.result || null,
+      pace: new Array(total + 1).fill(NaN),
+      prob: new Array(total + 1).fill(0),
+      gap: new Array(total + 1).fill(NaN),
+      gapMs: new Array(total + 1).fill(NaN),
+      interval: new Array(total + 1).fill(NaN),
+    };
+  });
+
+  const sim = { total, drivers, neutralSet, neutralGroups: [], leader: new Array(total + 1).fill(null), maxPos: 20, medianLap: 90000, feed: [] };
+
+  // Neutral groups
+  const ns = Array.from(neutralSet).sort((a, b) => a - b);
+  for (const lap of ns) {
+    const last = sim.neutralGroups[sim.neutralGroups.length - 1];
+    if (last && lap === last[1] + 1) last[1] = lap;
+    else sim.neutralGroups.push([lap, lap]);
+  }
+
+  // Recent clean pace.
+  for (const d of sim.drivers) {
+    for (let lap = 1; lap <= d.lastLap; lap++) {
+      let vals = [];
+      for (let ll = lap; ll >= Math.max(1, lap - 9); ll--) {
+        if (ll >= 2 && !neutralSet.has(ll) && !d.inOut.has(ll)) vals.push(d.laps[ll - 1]);
+        if (vals.length === 5) break;
+      }
+      if (vals.length < 2) {
+        vals = [];
+        for (let ll = lap; ll >= 1; ll--) {
+          vals.push(d.laps[ll - 1]);
+          if (vals.length === 5) break;
+        }
+      }
+      d.pace[lap] = vals.length ? median(vals) : NaN;
+    }
+  }
+
+  // Leaders, gaps, positions.
+  for (let lap = 1; lap <= total; lap++) {
+    const order = orderAt(sim, lap);
+    if (order.length) sim.leader[lap] = order[0];
+    for (const d of sim.drivers) {
+      if (lap > d.lastLap) continue;
+      if (order.length) {
+        const leader = order[0];
+        d.gapMs[lap] = Math.max(0, d.cum[lap] - leader.cum[lap]);
+        d.gap[lap] = d.gapMs[lap] / 1000;
+      }
+      d.interval[lap] = NaN;
+    }
+    for (let i = 1; i < order.length; i++) {
+      order[i].interval[lap] = Math.max(0, (order[i].cum[lap] - order[i - 1].cum[lap]) / 1000);
+    }
+  }
+
+  // Race median clean lap, for lapped display.
+  const medVals = [];
+  for (const d of sim.drivers) {
+    for (let lap = 2; lap <= d.lastLap; lap++) {
+      if (!neutralSet.has(lap) && !d.inOut.has(lap)) medVals.push(d.laps[lap - 1]);
+    }
+  }
+  sim.medianLap = medVals.length ? median(medVals) : 90000;
+  sim.maxPos = Math.max(2, ...sim.drivers.map((d) => Math.max(...d.pos, 2)));
+
+  // Win probabilities, one softmax per race lap.
+  const model = state.model;
+  for (let lap = 1; lap <= total; lap++) {
+    const running = orderAt(sim, lap);
+    if (running.length < 2) continue;
+    const leader = running[0];
+    const paceLead = leader.pace[lap];
+    const stops = running.map((d) => d.stopsBefore[lap]);
+    const medStops = median(stops);
+    const scores = [];
+    for (const d of running) {
+      const pos = d.pos[lap - 1];
+      const lapsLeft = total - lap;
+      const gap = d.gap[lap];
+      const pace = d.pace[lap];
+      const paceDiff = (isFinite(pace) && isFinite(paceLead)) ? clamp((pace - paceLead) / 1000, -3, 5) : 0;
+      const f = [
+        Math.log(pos),
+        Math.log(pos) * lapsLeft / total,
+        Math.min(gap, 300) / Math.sqrt(lapsLeft + 1),
+        paceDiff * Math.sqrt(lapsLeft + 1) / 10,
+        clamp(d.stopsBefore[lap] - medStops, -2, 2)
+      ];
+      let score = 0;
+      for (let i = 0; i < 5; i++) {
+        const z = (f[i] - model.scaler.mean[i]) / model.scaler.std[i];
+        score += model.coef[i] * z;
+      }
+      scores.push(score);
+    }
+    const mx = Math.max(...scores);
+    let sum = 0;
+    const ex = scores.map((s) => { const e = Math.exp(s - mx); sum += e; return e; });
+    for (let i = 0; i < running.length; i++) running[i].prob[lap] = ex[i] / sum;
+  }
+
+  // Feed events up to each lap.
+  const events = [];
+  let seq = 0;
+  let fastest = Infinity;
+  let fastestCode = null;
+  let prevLeader = null;
+  for (let lap = 1; lap <= total; lap++) {
+    const order = orderAt(sim, lap);
+    const leader = order.length ? order[0] : null;
+    if (lap === 1 && leader) {
+      events.push({ lap, seq: seq++, type: 'GREEN', code: leader.meta.code, text: `${leader.meta.code} leads at the start`, cls: 'lead' });
+    } else if (leader && prevLeader && leader.id !== prevLeader.id) {
+      events.push({ lap, seq: seq++, type: 'LEAD', code: leader.meta.code, text: `${leader.meta.code} takes the lead`, cls: 'lead' });
+    }
+    prevLeader = leader || prevLeader;
+    for (const d of sim.drivers) {
+      const lanes = d.pitByLap.get(lap);
+      if (lanes) {
+        for (const lane of lanes) {
+          const t = (lane == null || !isFinite(lane)) ? 'lane n/a' : `lane ${(lane / 1000).toFixed(3)} s`;
+          events.push({ lap, seq: seq++, type: 'PIT', code: d.meta.code, text: `${d.meta.code} · ${t}`, cls: '' });
+        }
+      }
+    }
+    if (lap >= 2) {
+      for (const d of order) {
+        const ms = d.laps[lap - 1];
+        if (ms < fastest) {
+          fastest = ms;
+          fastestCode = d.meta.code;
+          events.push({ lap, seq: seq++, type: 'FASTEST', code: d.meta.code, text: `${d.meta.code} · ${fmtLap(ms)}`, cls: '' });
+        }
+      }
+    }
+    for (const d of sim.drivers) {
+      if (d.lastLap === lap && lap < total && (d.noResult || (d.result && d.result.ret))) {
+        const why = d.noResult ? 'no result row in source data' : (d.result && d.result.st ? d.result.st : 'retired');
+        events.push({ lap, seq: seq++, type: 'OUT', code: d.meta.code, text: `${d.meta.code} · ${why}`, cls: 'out' });
+      }
+    }
+  }
+  for (const [a, b] of sim.neutralGroups) {
+    events.push({ lap: a, seq: seq++, type: 'NEUTRAL', code: '', text: `neutralised period begins · inferred from lap times`, cls: 'neutral' });
+    if (b + 1 <= total) events.push({ lap: b + 1, seq: seq++, type: 'GREEN', code: '', text: `green flag · lap ${b + 1}`, cls: '' });
+  }
+  events.sort((a, b) => a.lap - b.lap || a.seq - b.seq);
+  sim.feed = events;
+  return sim;
+}
+
+function ensureFocus() {
+  const running = orderAt(state.sim, state.lap);
+  if (!running.length) { state.focusId = null; state.aheadId = null; return; }
+  if (!running.some((d) => d.id === state.focusId)) {
+    state.focusId = running[Math.min(1, running.length - 1)].id;
+  }
+  const idx = running.findIndex((d) => d.id === state.focusId);
+  state.aheadId = idx > 0 ? running[idx - 1].id : (running.length > 1 ? running[1].id : null);
+}
+function focusDriver() { return driverById(state.sim, state.focusId); }
+function aheadDriver() { return driverById(state.sim, state.aheadId); }
+
+function renderTower() {
+  const sim = state.sim, lap = state.lap;
+  const order = orderAt(sim, lap);
+  const leader = order[0];
+  const focus = focusDriver();
+  const rows = [];
+  for (let i = 0; i < order.length; i++) {
+    const d = order[i];
+    const gap = d.gap[lap] || 0;
+    const lapsDown = gap > 0 ? Math.floor(gap * 1000 / sim.medianLap) : 0;
+    const gapText = d.id === leader.id ? '—' : lapsDown >= 1 ? `+${lapsDown} L` : `+${gap.toFixed(3)}`;
+    const intText = i === 0 ? '—' : `+${(d.interval[lap] || 0).toFixed(3)}`;
+    const age = ageAt(d, lap);
+    const p = d.prob[lap] || 0;
+    const title = `${d.meta.code} · ${d.meta.name} · ${d.team}`;
+    rows.push(`<tr class="${d.id === state.focusId ? 'focus' : ''}" data-id="${d.id}" tabindex="0" title="${esc(title)}" aria-label="${esc(title)}">
+      <td class="p">${d.pos[lap - 1]}</td><td class="code">${esc(d.meta.code)}</td><td class="gap" data-gap="${gap.toFixed(9)}">${gapText}</td>
+      <td class="dim">${intText}</td><td class="dim">${fmtLap(d.laps[lap - 1])}</td><td class="tyre" title="Tyre age in laps; compounds are not in the data">${age == null ? '—' : age}</td>
+      <td class="win" data-p="${p.toFixed(12)}">${fmtPct(p)}</td></tr>`);
+  }
+  $('towerBody').innerHTML = rows.join('');
+  $('towerMeta').textContent = `LAP ${lap} / ${sim.total} · ${order.length} RUNNING`;
+  const noResult = sim.drivers.filter((d) => d.noResult);
+  let note = 'Tyre age is laps since the last stop. Compounds and weather are not in the data.';
+  if (noResult.length) {
+    note += ' ' + noResult.map((d) => `<b>${esc(d.meta.code)}</b> (${esc(d.team)}): no result row in source data; team from ${esc(d.teamSource)}.`).join(' ');
+  }
+  $('towerNote').innerHTML = note;
+}
+
+function renderFeed() {
+  const lap = state.lap;
+  const events = state.sim.feed.filter((e) => e.lap <= lap).sort((a, b) => b.lap - a.lap || b.seq - a.seq).slice(0, 80);
+  if (!events.length) {
+    $('feed').innerHTML = '<div class="feed-item"><span class="feed-lap">L1</span><span class="feed-type">GREEN</span><span class="feed-text">race start</span></div>';
+  } else {
+    $('feed').innerHTML = events.map((e) => `<div class="feed-item ${e.cls}"><span class="feed-lap">L${e.lap}</span><span class="feed-type">${e.type}</span><span class="feed-text">${esc(e.text)}</span></div>`).join('');
+  }
+  $('feedMeta').textContent = `LAP ${lap} · ${events.length} SHOWN`;
+}
+
+function renderProbs() {
+  const sim = state.sim, lap = state.lap;
+  const order = orderAt(sim, lap).sort((a, b) => (b.prob[lap] || 0) - (a.prob[lap] || 0));
+  $('probBars').innerHTML = order.map((d) => {
+    const p = d.prob[lap] || 0;
+    const cls = d.id === state.focusId ? 'focus' : d.id === state.aheadId ? 'ahead' : 'other';
+    return `<div class="prob-row ${cls}" data-id="${d.id}" title="${esc(d.meta.code + ' · ' + d.meta.name + ' · ' + d.team)}"><span class="code">${esc(d.meta.code)}</span><span class="prob-track"><span class="prob-fill" style="width:${(p * 100).toFixed(3)}%"></span></span><span class="pct" data-p="${p.toFixed(12)}">${fmtPct(p)}</span></div>`;
+  }).join('');
+  $('probMeta').textContent = `LAP ${lap} · ${order.length} CARS`;
+  const focus = focusDriver();
+  $('probNote').textContent = focus && focus.pos[lap - 1] === 1
+    ? 'Focus leads. The dashed outline is P2, treated as the threat.'
+    : 'Focus is solid. The car ahead is a dashed outline.';
+}
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gauss(rng, mu, sigma) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function liveUc() {
+  const sim = state.sim, lap = state.lap;
+  const order = orderAt(sim, lap);
+  const focus = focusDriver();
+  if (!focus || order.length < 2) return null;
+  const fi = order.findIndex((d) => d.id === focus.id);
+  if (fi < 0) return null;
+  let mode, chaser, ahead;
+  if (fi === 0) {
+    mode = 'threat';
+    ahead = order[0];
+    chaser = order[1];
+  } else {
+    mode = 'focus';
+    chaser = order[fi];
+    ahead = order[fi - 1];
+  }
+  if (!chaser || !ahead) return null;
+  const gap = Math.max(0, (chaser.cum[lap] - ahead.cum[lap]) / 1000);
+  const circuit = state.index.circuits.find((c) => c.id === state.race.circuitId);
+  const okCircuit = circuit && circuit.ok;
+  const global = state.index.globalPitLoss;
+  const pitMed = okCircuit ? circuit.med : global.med;
+  const pitP25 = okCircuit ? circuit.p25 : global.p25;
+  const pitP75 = okCircuit ? circuit.p75 : global.p75;
+  const pitSd = okCircuit ? circuit.sd : global.sd;
+  const iqr = (pitP75 != null && pitP25 != null) ? pitP75 - pitP25 : 0;
+  const pitSigma = Math.max(0.05, iqr > 0.01 ? iqr / 1.349 : (pitSd || 0));
+  const wear = state.race.wear || {};
+  const wearOk = !!wear.reliable && isFinite(wear.slope) && isFinite(wear.sd);
+  const fallback = state.index.wearFallback;
+  const slope = wearOk ? wear.slope : fallback.slope;
+  const lapSd = Math.max(0.05, wearOk ? wear.sd : fallback.sd);
+  const aheadAge = Math.max(1, ageAt(ahead, lap) || 1);
+  return {
+    mode, chaser, ahead, gap, pitMed, pitSigma, slope, lapSd, aheadAge,
+    k: 3, traffic: 0,
+    circuit, okCircuit, wearOk, wear, fallback,
+  };
+}
+
+function computeUc(params) {
+  const N = 6000;
+  const seed = state.model.defaultSeed || 20261116;
+  const rng = mulberry32(seed);
+  const advantage = params.slope * params.aheadAge * params.k;
+  const offsets = new Array(N);
+  for (let i = 0; i < N; i++) {
+    const lc = clamp(gauss(rng, params.pitMed, params.pitSigma), 5, 45);
+    const la = clamp(gauss(rng, params.pitMed, params.pitSigma), 5, 45);
+    const noise = gauss(rng, 0, params.lapSd * Math.sqrt(2 * params.k));
+    offsets[i] = lc + params.traffic - la - advantage + noise;
+  }
+  const pAt = (gap) => {
+    let c = 0;
+    for (let i = 0; i < N; i++) if (gap + offsets[i] < 0) c++;
+    return c / N;
+  };
+  const p = pAt(params.gap);
+  const margins = new Array(N);
+  for (let i = 0; i < N; i++) margins[i] = -(params.gap + offsets[i]);
+  margins.sort((a, b) => a - b);
+  const med = quantile(margins, 0.5);
+  const p10 = quantile(margins, 0.10);
+  const p90 = quantile(margins, 0.90);
+  let be = null;
+  if (pAt(0) >= 0.5) {
+    let lo = 0, hi = 60;
+    if (pAt(hi) >= 0.5) be = 60;
+    else {
+      for (let it = 0; it < 45; it++) {
+        const mid = (lo + hi) / 2;
+        if (pAt(mid) >= 0.5) lo = mid; else hi = mid;
+      }
+      be = (lo + hi) / 2;
+    }
+  }
+  const maxGap = clamp(Math.max(6, params.gap * 1.4, be ? be * 1.5 : 6), 6, 60);
+  const curve = [];
+  for (let i = 0; i <= 120; i++) {
+    const g = maxGap * i / 120;
+    curve.push([g, pAt(g)]);
+  }
+  return { p, med, p10, p90, be, maxGap, curve, advantage, N };
+}
+
+function renderUcCurve(result, params) {
+  const svg = $('ucCurve');
+  const box = svg.parentElement;
+  const w = Math.max(140, Math.floor(box.clientWidth || 280));
+  const h = Math.max(80, Math.floor(box.clientHeight || 104));
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const m = { l: 28, r: 8, t: 10, b: 18 };
+  const plot = makePlot(w, h, m);
+  const x = (g) => plot.x + (g / result.maxGap) * plot.w;
+  const y = (p) => plot.y + (1 - p) * plot.h;
+  add(svg, svgEl('line', { class: 'grid-line', x1: plot.x, x2: plot.x + plot.w, y1: y(0.5), y2: y(0.5) }));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 4, y: y(0.5) + 2.5, 'text-anchor': 'end' }, '50'));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 4, y: y(1) + 2.5, 'text-anchor': 'end' }, '100'));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 4, y: y(0) + 2.5, 'text-anchor': 'end' }, '0'));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x + plot.w, y: plot.y + plot.h + 12, 'text-anchor': 'end' }, `${result.maxGap.toFixed(0)} s gap`));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x, y: plot.y + plot.h + 12, 'text-anchor': 'start' }, '0'));
+  add(svg, svgEl('path', { class: 'series-focus', d: pathFor(result.curve.map(([g, p]) => [x(g), y(p)])) }));
+  const cx = x(clamp(params.gap, 0, result.maxGap));
+  add(svg, svgEl('line', { class: 'now-line', x1: cx, x2: cx, y1: plot.y, y2: plot.y + plot.h }));
+  add(svg, svgEl('rect', { class: 'uc-dot', x: cx - 2, y: y(result.p) - 2, width: 4, height: 4 }));
+}
+
+function setSlider(id, val, text, nd = 2) {
+  const el = $(id);
+  el.value = String(val);
+  $(text).textContent = nd === 0 ? String(Math.round(val)) : `${Number(val).toFixed(nd)}`;
+}
+
+function renderUndercut() {
+  const live = liveUc();
+  if (!live) {
+    $('ucRoles').textContent = 'NOT APPLICABLE';
+    $('ucVerdict').className = 'verdict stay';
+    $('ucVerdict').firstChild.textContent = 'STAY OUT';
+    $('ucVerdictSub').textContent = 'no car ahead';
+    $('ucP').textContent = '—';
+    $('ucMed').textContent = '—'; $('ucRange').textContent = '—'; $('ucBE').textContent = '—'; $('ucAdv').textContent = '—';
+    $('ucEstimate').textContent = 'No car pair to evaluate at this lap.';
+    $('ucSource').textContent = '';
+    ['ucGap','ucPit','ucWear','ucAge','ucK','ucTraffic'].forEach((id) => { $(id).disabled = true; });
+    return;
+  }
+  if (!state.uc.dirty || !state.uc.params) {
+    state.uc.live = live;
+    state.uc.params = {
+      gap: clamp(live.gap, 0, 60), pitMed: live.pitMed, pitSigma: live.pitSigma,
+      slope: live.slope, lapSd: live.lapSd, aheadAge: clamp(live.aheadAge, 1, 45),
+      k: 3, traffic: 0,
+    };
+  }
+  const params = state.uc.params;
+  // Always refresh the roles and source text from the live pair.
+  state.uc.live = live;
+  $('ucRoles').textContent = live.mode === 'threat' ? `THREAT · ${live.chaser.meta.code} vs ${live.ahead.meta.code}` : `${live.chaser.meta.code} vs ${live.ahead.meta.code}`;
+  $('ucGapVal').textContent = `${params.gap.toFixed(1)} s`;
+  $('ucPitVal').textContent = `${params.pitMed.toFixed(2)} s`;
+  $('ucWearVal').textContent = `${params.slope.toFixed(3)} s/lap`;
+  $('ucAgeVal').textContent = `${Math.round(params.aheadAge)} laps`;
+  $('ucKVal').textContent = `${Math.round(params.k)}`;
+  $('ucTrafficVal').textContent = `${params.traffic.toFixed(1)} s`;
+  $('ucGap').value = String(params.gap);
+  $('ucPit').value = String(params.pitMed);
+  $('ucWear').value = String(params.slope);
+  $('ucAge').value = String(params.aheadAge);
+  $('ucK').value = String(params.k);
+  $('ucTraffic').value = String(params.traffic);
+  ['ucGap','ucPit','ucWear','ucAge','ucK','ucTraffic'].forEach((id) => { $(id).disabled = false; });
+
+  const result = computeUc(params);
+  state.uc.result = result;
+  const p = result.p;
+  const verdict = p >= 0.65 ? ['BOX NOW', 'box'] : p >= 0.45 ? ['MARGINAL', 'marginal'] : ['STAY OUT', 'stay'];
+  $('ucVerdict').className = `verdict ${verdict[1]}`;
+  $('ucVerdict').firstChild.textContent = verdict[0];
+  let sub;
+  if (live.mode === 'threat') {
+    sub = p >= 0.65 ? 'P2 undercut risk high · cover now' : p >= 0.45 ? 'P2 undercut risk · monitor' : 'P2 undercut risk low · stay out';
+  } else {
+    sub = p >= 0.65 ? 'chaser likely ahead after stops' : p >= 0.45 ? 'too close to call' : 'track position likely holds';
+  }
+  $('ucVerdictSub').textContent = sub;
+  $('ucP').textContent = `${fmtPct(p)}%`;
+  $('ucPLabel').textContent = `P(${live.chaser.meta.code} AHEAD)`;
+  $('ucMed').textContent = `${fmtSigned(result.med)} s`;
+  $('ucRange').textContent = `${fmtSigned(result.p10)} / ${fmtSigned(result.p90)} s`;
+  $('ucBE').textContent = result.be == null ? '—' : `${result.be.toFixed(2)} s`;
+  $('ucAdv').textContent = `${result.advantage.toFixed(2)} s`;
+
+  let source = '';
+  if (live.mode === 'threat') source = `Focus leads. ${live.chaser.meta.code} is treated as the chaser and ${live.ahead.meta.code} as the car ahead. `;
+  source += live.okCircuit
+    ? `Circuit n=${live.circuit.n} stops.`
+    : `Circuit n=${live.circuit ? live.circuit.n : 0} (<15); using the global pool.`;
+  source += live.wearOk ? ` Race wear fit reliable.` : ` Race wear fit unreliable; using the all-race median.`;
+  $('ucSource').textContent = source;
+
+  let est = `Mean advantage = wear ${params.slope.toFixed(3)} × ahead age ${Math.round(params.aheadAge)} × k ${Math.round(params.k)} = <b>${result.advantage.toFixed(2)} s</b>. Pit loss ~ N(${params.pitMed.toFixed(2)}, IQR/1.349 = ${params.pitSigma.toFixed(2)}) for both cars; lap noise sd ${params.lapSd.toFixed(2)} s × √(2k); ${result.N.toLocaleString('en-US')} seeded draws. Estimate.`;
+  if (!live.wearOk) est += ` Unreliable fit: ${esc(live.wear.reason || 'slope or scatter outside limits')}. Using all-race median slope ${live.fallback.slope.toFixed(3)} s/lap and sd ${live.fallback.sd.toFixed(2)} s.`;
+  if (!live.okCircuit) est += ` Circuit below the 15-stop minimum; using global median ${state.index.globalPitLoss.med.toFixed(2)} s (n=${state.index.globalPitLoss.n}).`;
+  $('ucEstimate').innerHTML = est;
+  renderUcCurve(result, params);
+}
+
+function bindUc() {
+  const ids = { ucGap: 'gap', ucPit: 'pitMed', ucWear: 'slope', ucAge: 'aheadAge', ucK: 'k', ucTraffic: 'traffic' };
+  for (const [id, key] of Object.entries(ids)) {
+    $(id).addEventListener('input', (ev) => {
+      if (!state.uc.params) return;
+      state.uc.dirty = true;
+      state.uc.params[key] = Number(ev.target.value);
+      if (key === 'slope') state.uc.params.slope = Number(ev.target.value);
+      renderUndercut();
+    });
+  }
+  $('ucReset').addEventListener('click', () => {
+    state.uc.dirty = false;
+    state.uc.params = null;
+    renderUndercut();
+  });
+}
+
+function drawLapChart() {
+  const sim = state.sim;
+  const { svg, w, h } = clearSvg($('lapChartWrap'));
+  const m = { l: 28, r: 34, t: 14, b: 20 };
+  const plot = makePlot(w, h, m);
+  const x = xScale(plot, sim.total);
+  const maxPos = sim.maxPos;
+  const y = (p) => plot.y + (p - 1) / Math.max(1, maxPos - 1) * plot.h;
+  drawNeutral(svg, sim, plot, x);
+  const xt = [];
+  for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+  if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+  if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+  const yt = [1, 5, 10, 15, 20, maxPos].filter((v, i, a) => v <= maxPos && a.indexOf(v) === i).map((v) => ({ value: v, label: String(v) }));
+  drawGrid(svg, plot, xt, yt, x, (v) => y(v));
+  drawNow(svg, plot, x);
+  const others = sim.drivers.filter((d) => d.id !== state.focusId && d.id !== state.aheadId);
+  for (const d of others) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (d.pos[l - 1] != null) pts.push([x(l), y(d.pos[l - 1])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+  }
+  const ahead = aheadDriver();
+  if (ahead) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) if (ahead.pos[l - 1] != null) pts.push([x(l), y(ahead.pos[l - 1])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+  }
+  const focus = focusDriver();
+  if (focus) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) if (focus.pos[l - 1] != null) pts.push([x(l), y(focus.pos[l - 1])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+  }
+  const order = orderAt(sim, state.lap);
+  const labels = [];
+  const addLabel = (d, cls = 'series-label') => {
+    if (!d) return;
+    const p = d.pos[state.lap - 1];
+    if (p == null) return;
+    labels.push({ text: d.meta.code, x: x(state.lap) + 3, y: y(p), cls });
+  };
+  addLabel(focus);
+  addLabel(ahead, 'series-label-muted');
+  if (order[0] && order[0].id !== state.focusId && order[0].id !== state.aheadId) addLabel(order[0], 'series-label-muted');
+  placeLabels(labels, 9, plot.y + 5, plot.y + plot.h - 2);
+  for (const l of labels) add(svg, svgEl('text', { class: l.cls, x: l.x, y: l.y + 2.5 }, l.text));
+  $('lapChartTag').textContent = `${order.length} RUNNING`;
+  $('lapChartNote').textContent = `Neutralised laps shaded. P1 at the top.`;
+}
+
+function drawGapChart() {
+  const sim = state.sim;
+  const { svg, w, h } = clearSvg($('gapChartWrap'));
+  const m = { l: 32, r: 36, t: 14, b: 20 };
+  const plot = makePlot(w, h, m);
+  const x = xScale(plot, sim.total);
+  const visible = [];
+  for (const d of sim.drivers) {
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isFinite(d.gap[l])) visible.push(d.gap[l]);
+  }
+  const p95 = visible.length ? quantile(visible.slice().sort((a, b) => a - b), 0.95) : 10;
+  const maxGap = Math.min(180, Math.max(10, Math.ceil(p95 / 10) * 10));
+  const y = (g) => plot.y + clamp(g, 0, maxGap) / maxGap * plot.h;
+  drawNeutral(svg, sim, plot, x);
+  const xt = [];
+  for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+  if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+  if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+  const yt = [0, maxGap / 2, maxGap].map((v) => ({ value: v, label: `${v.toFixed(0)}` }));
+  drawGrid(svg, plot, xt, yt, x, y);
+  drawNow(svg, plot, x);
+  const others = sim.drivers.filter((d) => d.id !== state.focusId && d.id !== state.aheadId);
+  for (const d of others) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isFinite(d.gap[l])) pts.push([x(l), y(d.gap[l])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+  }
+  const ahead = aheadDriver();
+  if (ahead) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) if (isFinite(ahead.gap[l])) pts.push([x(l), y(ahead.gap[l])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+  }
+  const focus = focusDriver();
+  if (focus) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) if (isFinite(focus.gap[l])) pts.push([x(l), y(focus.gap[l])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+  }
+  const order = orderAt(sim, state.lap);
+  const labels = [];
+  const addLabel = (d, cls = 'series-label') => {
+    if (!d) return;
+    labels.push({ text: d.meta.code, x: x(state.lap) + 3, y: y(d.gap[state.lap] || 0), cls });
+  };
+  addLabel(focus);
+  addLabel(ahead, 'series-label-muted');
+  if (order[0] && order[0].id !== state.focusId && order[0].id !== state.aheadId) addLabel(order[0], 'series-label-muted');
+  placeLabels(labels, 9, plot.y + 5, plot.y + plot.h - 2);
+  for (const l of labels) add(svg, svgEl('text', { class: l.cls, x: l.x, y: l.y + 2.5 }, l.text));
+  const clipped = visible.some((v) => v > maxGap);
+  $('gapChartTag').textContent = `${maxGap.toFixed(0)} s AXIS`;
+  $('gapChartNote').textContent = clipped ? `Gaps above ${maxGap.toFixed(0)} s are clipped.` : 'Zero is the leader.';
+}
+
+function drawPaceChart() {
+  const sim = state.sim;
+  const { svg, w, h } = clearSvg($('paceChartWrap'));
+  const m = { l: 38, r: 36, t: 14, b: 20 };
+  const plot = makePlot(w, h, m);
+  const x = xScale(plot, sim.total);
+  const focus = focusDriver();
+  const ahead = aheadDriver();
+  const vals = [];
+  for (const d of [focus, ahead]) {
+    if (!d) continue;
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isClean(d, l)) vals.push(d.laps[l - 1] / 1000);
+  }
+  if (!vals.length) {
+    drawNeutral(svg, sim, plot, x);
+    const xt = [];
+    for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+    if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+    if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+    drawGrid(svg, plot, xt, [], x, (v) => plot.y, false);
+    drawNow(svg, plot, x);
+    add(svg, svgEl('text', { class: 'axis-label', x: w / 2, y: h / 2, 'text-anchor': 'middle' }, 'NO CLEAN LAPS YET'));
+    $('paceChartTag').textContent = focus ? `${focus.meta.code} VS ${ahead ? ahead.meta.code : '—'}` : 'NO FOCUS';
+    $('paceChartNote').textContent = 'No clean laps in the visible window.';
+    return;
+  }
+  const vmin = Math.min(...vals), vmax = Math.max(...vals);
+  const pad = Math.max(0.25, (vmax - vmin) * 0.12);
+  const lo = vmin - pad, hi = vmax + pad;
+  const y = (ms) => plot.y + (hi - ms / 1000) / (hi - lo) * plot.h;
+  drawNeutral(svg, sim, plot, x);
+  const xt = [];
+  for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+  if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+  if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+  const mid = (lo + hi) / 2;
+  const yt = [{ value: lo, label: lo.toFixed(1) }, { value: mid, label: mid.toFixed(1) }, { value: hi, label: hi.toFixed(1) }];
+  drawGrid(svg, plot, xt, yt, x, y);
+  drawNow(svg, plot, x);
+  const drawSeries = (d, cls) => {
+    if (!d) return;
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isClean(d, l)) pts.push([x(l), y(d.laps[l - 1])]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: cls, d: pathFor(pts) }));
+  };
+  drawSeries(ahead, 'series-ahead');
+  drawSeries(focus, 'series-focus');
+  // Current-stint OLS for the focus car.
+  let olsText = 'OLS n<3';
+  if (focus) {
+    const stint = focus.stints.find(([a, b]) => state.lap >= a && state.lap <= b) || null;
+    if (stint) {
+      const pts = [];
+      for (let l = stint[0]; l <= Math.min(state.lap, stint[1]); l++) {
+        if (isClean(focus, l) && focus.age[l] != null) pts.push({ age: focus.age[l], lap: l, ms: focus.laps[l - 1] / 1000 });
+      }
+      if (pts.length >= 3) {
+        const n = pts.length;
+        const sx = pts.reduce((s, p) => s + p.age, 0);
+        const sy = pts.reduce((s, p) => s + p.ms, 0);
+        const sxx = pts.reduce((s, p) => s + p.age * p.age, 0);
+        const sxy = pts.reduce((s, p) => s + p.age * p.ms, 0);
+        const den = n * sxx - sx * sx;
+        if (Math.abs(den) > 1e-9) {
+          const b = (n * sxy - sx * sy) / den;
+          const a = (sy - b * sx) / n;
+          const linePts = [];
+          for (let l = stint[0]; l <= Math.min(state.lap, stint[1]); l++) {
+            if (focus.age[l] != null) linePts.push([x(l), y((a + b * focus.age[l]) * 1000)]);
+          }
+          if (linePts.length > 1) add(svg, svgEl('path', { class: 'ols-line', d: pathFor(linePts) }));
+          olsText = `${fmtSigned(b, 3)} s/lap · n=${n}`;
+        }
+      }
+    }
+  }
+  const labels = [];
+  if (focus) labels.push({ text: focus.meta.code, x: x(state.lap) + 3, y: y(focus.laps[state.lap - 1]), cls: 'series-label' });
+  if (ahead) labels.push({ text: ahead.meta.code, x: x(state.lap) + 3, y: y(ahead.laps[state.lap - 1]), cls: 'series-label-muted' });
+  placeLabels(labels, 9, plot.y + 5, plot.y + plot.h - 2);
+  for (const l of labels) add(svg, svgEl('text', { class: l.cls, x: l.x, y: l.y + 2.5 }, l.text));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x + 2, y: plot.y + 9 }, olsText));
+  $('paceChartTag').textContent = focus ? `${focus.meta.code} VS ${ahead ? ahead.meta.code : '—'}` : 'NO FOCUS';
+  $('paceChartNote').textContent = `${olsText}.`;
+}
+
+function drawStrategyChart() {
+  const sim = state.sim;
+  const { svg, w, h } = clearSvg($('strategyChartWrap'));
+  const m = { l: 38, r: 8, t: 10, b: 16 };
+  const plot = makePlot(w, h, m);
+  const x = xScale(plot, sim.total);
+  drawNeutral(svg, sim, plot, x, false);
+  const running = orderAt(sim, state.lap);
+  const rest = sim.drivers.filter((d) => !running.some((r) => r.id === d.id)).sort((a, b) => {
+    const pa = a.pos[a.lastLap - 1] || 99, pb = b.pos[b.lastLap - 1] || 99;
+    return pa - pb || a.id - b.id;
+  });
+  const rows = running.concat(rest);
+  const rowH = plot.h / Math.max(1, rows.length);
+  const barH = Math.max(2, Math.min(5, rowH * 0.36));
+  for (let i = 0; i < rows.length; i++) {
+    const d = rows[i];
+    const yy = plot.y + i * rowH + rowH / 2;
+    const isFocus = d.id === state.focusId, isAhead = d.id === state.aheadId;
+    const labelCls = isFocus ? 'series-label' : 'series-label-muted';
+    add(svg, svgEl('text', { class: labelCls, x: plot.x - 4, y: yy + 2.5, 'text-anchor': 'end' }, d.meta.code));
+    for (let s = 0; s < d.stints.length; s++) {
+      const [a, b] = d.stints[s];
+      if (a > state.lap) continue;
+      const bb = Math.min(b, state.lap);
+      if (bb < a) continue;
+      const x1 = x(a) - (sim.total > 1 ? (plot.w / (sim.total - 1)) * 0.45 : 0);
+      const x2 = x(bb) + (sim.total > 1 ? (plot.w / (sim.total - 1)) * 0.45 : 0);
+      let cls;
+      if (isFocus) cls = 'stint-focus';
+      else if (isAhead) cls = 'stint-ahead';
+      else cls = s % 2 ? 'stint-other-odd' : 'stint-other-even';
+      add(svg, svgEl('rect', { class: cls, x: Math.max(plot.x, x1), y: yy - barH / 2, width: Math.max(1, Math.min(x2, plot.x + plot.w) - Math.max(plot.x, x1)), height: barH }));
+    }
+    for (const [pl] of d.pits) {
+      if (pl > state.lap) continue;
+      add(svg, svgEl('line', { class: isFocus || isAhead ? 'pit-tick' : 'pit-tick-muted', x1: x(pl), x2: x(pl), y1: yy - barH - 1, y2: yy + barH + 1 }));
+    }
+  }
+  const xt = [];
+  for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+  if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+  if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+  drawGrid(svg, { ...plot, y: plot.y, h: plot.h }, xt, [], x, (v) => plot.y, false);
+  drawNow(svg, plot, x);
+  $('strategyChartTag').textContent = `${rows.length} CARS`;
+}
+
+function drawProbChart() {
+  const sim = state.sim;
+  const { svg, w, h } = clearSvg($('probChartWrap'));
+  const m = { l: 34, r: 40, t: 14, b: 20 };
+  const plot = makePlot(w, h, m);
+  const x = xScale(plot, sim.total);
+  const y = (p) => plot.y + (1 - p) * plot.h;
+  drawNeutral(svg, sim, plot, x);
+  const xt = [];
+  for (let l = 1; l <= sim.total; l += 10) xt.push({ value: l, label: String(l) });
+  if (!xt.some((t) => t.value === 1)) xt.unshift({ value: 1, label: '1' });
+  if (!xt.some((t) => t.value === sim.total)) xt.push({ value: sim.total, label: String(sim.total) });
+  const yt = [0, 0.25, 0.5, 0.75, 1].map((v) => ({ value: v, label: `${Math.round(v * 100)}` }));
+  drawGrid(svg, plot, xt, yt, x, (v) => y(v));
+  drawNow(svg, plot, x);
+  const others = sim.drivers.filter((d) => d.id !== state.focusId && d.id !== state.aheadId);
+  for (const d of others) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= d.lastLap; l++) pts.push([x(l), y(d.prob[l] || 0)]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+  }
+  const ahead = aheadDriver();
+  if (ahead) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) pts.push([x(l), y(ahead.prob[l] || 0)]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+  }
+  const focus = focusDriver();
+  if (focus) {
+    const pts = [];
+    for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) pts.push([x(l), y(focus.prob[l] || 0)]);
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+  }
+  const order = orderAt(sim, state.lap);
+  const labels = [];
+  const addLabel = (d, cls = 'series-label') => {
+    if (!d) return;
+    labels.push({ text: d.meta.code, x: x(state.lap) + 3, y: y(d.prob[state.lap] || 0), cls });
+  };
+  addLabel(focus);
+  addLabel(ahead, 'series-label-muted');
+  if (order[0] && order[0].id !== state.focusId && order[0].id !== state.aheadId) addLabel(order[0], 'series-label-muted');
+  placeLabels(labels, 9, plot.y + 5, plot.y + plot.h - 2);
+  for (const l of labels) add(svg, svgEl('text', { class: l.cls, x: l.x, y: l.y + 2.5 }, l.text));
+  $('probChartTag').textContent = `${sim.total} LAPS`;
+  $('probChartNote').textContent = `At lap ${state.lap}, the leader is ${order[0] ? order[0].meta.code : '—'}.`;
+}
+
+function drawPitCard() {
+  const container = $('pitChart');
+  const circuits = state.index.circuits.slice();
+  const rowH = 13;
+  container.style.height = `${Math.max(120, circuits.length * rowH + 28)}px`;
+  const { svg, w, h } = clearSvg(container);
+  const left = w < 420 ? 94 : 142;
+  const right = w < 420 ? 52 : 72;
+  const m = { l: left, r: right, t: 12, b: 16 };
+  const plot = makePlot(w, h, m);
+  const maxV = 30;
+  const x = (v) => plot.x + clamp(v, 0, maxV) / maxV * plot.w;
+  const yTick = [0, 10, 20, 30];
+  for (const v of yTick) {
+    add(svg, svgEl('line', { class: 'grid-line', x1: x(v), x2: x(v), y1: plot.y, y2: plot.y + plot.h }));
+    add(svg, svgEl('text', { class: 'axis-label', x: x(v), y: plot.y + plot.h + 11, 'text-anchor': 'middle' }, String(v)));
+  }
+  for (let i = 0; i < circuits.length; i++) {
+    const c = circuits[i];
+    const yy = plot.y + i * rowH + rowH / 2;
+    const isFocus = c.id === state.race.circuitId;
+    const name = trunc(c.name, w < 420 ? 14 : 25);
+    add(svg, svgEl('text', { class: isFocus ? 'series-label' : 'series-label-muted', x: plot.x - 6, y: yy + 2.5, 'text-anchor': 'end' }, name));
+    if (c.ok && c.med != null) {
+      add(svg, svgEl('rect', { class: isFocus ? 'bar-fill-focus' : 'bar-fill', x: plot.x, y: yy - 2.5, width: Math.max(1, x(c.med) - plot.x), height: 5 }));
+      add(svg, svgEl('line', { class: isFocus ? 'iqr-focus' : 'iqr', x1: x(c.p25), x2: x(c.p75), y1: yy, y2: yy }));
+      add(svg, svgEl('line', { class: isFocus ? 'iqr-focus' : 'iqr', x1: x(c.med), x2: x(c.med), y1: yy - 3.5, y2: yy + 3.5 }));
+      add(svg, svgEl('text', { class: isFocus ? 'series-label' : 'series-label-muted', x: plot.x + plot.w + 4, y: yy + 2.5, 'text-anchor': 'start' }, c.med.toFixed(1)));
+      add(svg, svgEl('text', { class: 'axis-label', x: w - 2, y: yy + 2.5, 'text-anchor': 'end' }, `n${c.n}`));
+    } else {
+      add(svg, svgEl('text', { class: 'axis-label', x: plot.x + 2, y: yy + 2.5, 'text-anchor': 'start' }, `n=${c.n} · below 15`));
+    }
+  }
+  $('pitCardTag').textContent = `${circuits.length} CIRCUITS`;
+  const circuit = state.index.circuits.find((c) => c.id === state.race.circuitId);
+  let note = `Green-flag stops only, 5–45 s. IQR bar with median tick. Global median ${state.index.globalPitLoss.med.toFixed(2)} s (n=${state.index.globalPitLoss.n}).`;
+  if (circuit) {
+    note += ` Current circuit: ${circuit.name}, ${circuit.med != null ? circuit.med.toFixed(2) + ' s' : 'no data'}, n=${circuit.n}${circuit.ok ? '' : ' — below the 15-stop minimum; the calculator uses the global pool'}.`;
+  }
+  $('pitCardNote').innerHTML = note;
+}
+
+function drawWearCard() {
+  const container = $('wearChart');
+  const { svg, w, h } = clearSvg(container);
+  const races = state.season.races.slice().sort((a, b) => a.round - b.round);
+  const m = { l: 34, r: 10, t: 12, b: 20 };
+  const plot = makePlot(w, h, m);
+  const lo = -0.05, hi = 0.15;
+  const y = (v) => plot.y + (hi - clamp(v, lo, hi)) / (hi - lo) * plot.h;
+  const zero = y(0);
+  for (const v of [lo, 0, 0.05, 0.10, hi]) {
+    add(svg, svgEl('line', { class: 'grid-line', x1: plot.x, x2: plot.x + plot.w, y1: y(v), y2: y(v) }));
+    add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 4, y: y(v) + 2.5, 'text-anchor': 'end' }, v.toFixed(2)));
+  }
+  const bw = plot.w / Math.max(1, races.length);
+  const barW = Math.max(2, Math.min(10, bw * 0.58));
+  const fb = state.index.wearFallback.slope;
+  add(svg, svgEl('line', { class: 'fallback-line', x1: plot.x, x2: plot.x + plot.w, y1: y(fb), y2: y(fb) }));
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x + plot.w - 2, y: y(fb) - 3, 'text-anchor': 'end' }, `ALL-RACE ${fb.toFixed(3)}`));
+  for (let i = 0; i < races.length; i++) {
+    const r = races[i];
+    const xx = plot.x + (i + 0.5) * bw;
+    const wear = r.wear || {};
+    const isFocus = r.id === state.race.id;
+    const raw = isFinite(wear.slope) ? wear.slope : fb;
+    const top = y(Math.max(raw, 0)), bot = y(Math.min(raw, 0));
+    if (wear.reliable) {
+      add(svg, svgEl('rect', { class: isFocus ? 'bar-fill-focus' : 'bar-fill', x: xx - barW / 2, y: Math.min(top, bot), width: barW, height: Math.max(1, Math.abs(bot - top)) }));
+    } else {
+      add(svg, svgEl('rect', { class: isFocus ? 'bar-hollow-focus' : 'bar-hollow', x: xx - barW / 2, y: Math.min(top, bot), width: barW, height: Math.max(1, Math.abs(bot - top)) }));
+    }
+    if (isFocus) {
+      add(svg, svgEl('line', { class: 'now-line', x1: xx, x2: xx, y1: plot.y, y2: plot.y + plot.h }));
+    }
+  }
+  for (let i = 0; i < races.length; i++) {
+    if (i % 4 === 0 || i === races.length - 1) {
+      add(svg, svgEl('text', { class: 'axis-label', x: plot.x + (i + 0.5) * bw, y: plot.y + plot.h + 12, 'text-anchor': 'middle' }, `R${String(races[i].round).padStart(2, '0')}`));
+    }
+  }
+  const wr = state.race.wear || {};
+  $('wearCardTag').textContent = `R${String(state.race.round).padStart(2, '0')} · ${wr.reliable ? 'RELIABLE' : 'UNRELIABLE'}`;
+  let note = `Bars are per-race OLS slopes, lap time on stint age + race lap with driver fixed effects. Hollow = fit failed a reliability check.`;
+  if (wr.reliable) {
+    note += ` Current race: ${wr.slope.toFixed(4)} s/lap, within R² ${wr.r2.toFixed(3)}, n=${wr.n} — reliable.`;
+  } else {
+    note += ` Current race: raw ${wr.slope != null ? wr.slope.toFixed(4) : '—'} s/lap, within R² ${wr.r2 != null ? wr.r2.toFixed(3) : '—'}, n=${wr.n || 0} — UNRELIABLE: ${wr.reason || 'outside limits'}. Using all-race median ${state.index.wearFallback.slope.toFixed(4)} s/lap.`;
+  }
+  $('wearCardNote').innerHTML = note;
+}
+
+function drawModelCard() {
+  const m = state.model;
+  const rows = [
+    ['full', m.metrics.model.logloss, m.metrics.model.brier, m.metrics.model.accuracy, true, ''],
+    ['position only', m.metrics.position.logloss, m.metrics.position.brier, m.metrics.position.accuracy, false, ''],
+    ['leader wins', m.metrics.leader.logloss, m.metrics.leader.brier, m.metrics.leader.accuracy, false, 'log-loss clipped at 1e-6'],
+    ['uniform', m.metrics.uniform.logloss, m.metrics.uniform.brier, m.metrics.uniform.accuracy, false, 'accuracy is random guess'],
+  ];
+  $('modelRows').innerHTML = rows.map(([name, ll, br, acc, best, sub]) => `<tr class="${best ? 'best' : ''}"><td>${name}${sub ? `<span class="sub">${sub}</span>` : ''}</td><td>${ll.toFixed(4)}</td><td>${br.toFixed(4)}</td><td>${(acc * 100).toFixed(1)}%</td></tr>`).join('');
+  const svg = $('calChart');
+  const box = svg.parentElement;
+  const w = Math.max(120, Math.floor(box.clientWidth || 200));
+  const h = Math.max(100, Math.floor(box.clientHeight || 156));
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const mm = { l: 22, r: 6, t: 8, b: 20 };
+  const plot = makePlot(w, h, mm);
+  const x = (p) => plot.x + p * plot.w;
+  const y = (p) => plot.y + (1 - p) * plot.h;
+  add(svg, svgEl('line', { class: 'grid-line', x1: plot.x, x2: plot.x + plot.w, y1: plot.y + plot.h, y2: plot.y + plot.h }));
+  add(svg, svgEl('line', { class: 'grid-line', x1: plot.x, x2: plot.x, y1: plot.y, y2: plot.y + plot.h }));
+  add(svg, svgEl('line', { class: 'cal-diag', x1: x(0), y1: y(0), x2: x(1), y2: y(1) }));
+  for (const p of [0, 0.5, 1]) {
+    add(svg, svgEl('text', { class: 'axis-label', x: x(p), y: plot.y + plot.h + 11, 'text-anchor': 'middle' }, `${Math.round(p * 100)}`));
+    add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 3, y: y(p) + 2.5, 'text-anchor': 'end' }, `${Math.round(p * 100)}`));
+  }
+  add(svg, svgEl('text', { class: 'axis-label', x: plot.x + plot.w / 2, y: h - 2, 'text-anchor': 'middle' }, 'PREDICTED %'));
+  add(svg, svgEl('text', { class: 'axis-label', x: 2, y: plot.y + plot.h / 2, 'text-anchor': 'start', transform: `rotate(-90 2 ${plot.y + plot.h / 2})` }, 'OBSERVED %'));
+  const pts = m.calibration.filter((b) => b.n > 0);
+  if (pts.length > 1) add(svg, svgEl('path', { class: 'cal-line', d: pathFor(pts.map((b) => [x(b.p), y(b.obs)])) }));
+  for (const b of pts) add(svg, svgEl('rect', { class: 'cal-dot', x: x(b.p) - 1.6, y: y(b.obs) - 1.6, width: 3.2, height: 3.2 }));
+  $('modelCardTag').textContent = `${m.test.rows.toLocaleString('en-US')} CAR-LAPS`;
+  $('modelNote').innerHTML = `Train ${m.train.years}, ${m.train.rows.toLocaleString('en-US')} rows. Test ${m.test.years}, ${m.test.rows.toLocaleString('en-US')} rows, ${m.test.groups.toLocaleString('en-US')} race-lap groups. Five features: log position, log position × laps left, gap to leader, recent pace vs leader, stop-count deviation. L2 ${m.lambda}. Full model beats position-only by ${(m.metrics.position.logloss - m.metrics.model.logloss).toFixed(4)} log-loss. Brier is per race-lap, summed over running cars. Calibration bins on held-out car-laps. <b>The model ignores future pit stops; odds wobble in pit cycles.</b>`;
+}
+
+function renderEvidence() {
+  if (!state.evidenceDirty) return;
+  drawPitCard();
+  drawWearCard();
+  drawModelCard();
+  state.evidenceDirty = false;
+}
+
+function renderCharts() {
+  if (!state.sim) return;
+  drawLapChart();
+  drawGapChart();
+  drawPaceChart();
+  drawStrategyChart();
+  drawProbChart();
+}
+
+function renderAll() {
+  if (!state.sim) return;
+  ensureFocus();
+  $('lapNow').textContent = String(state.lap);
+  $('lapTotal').textContent = String(state.sim.total);
+  $('scrub').max = String(state.sim.total);
+  $('scrub').value = String(state.lap);
+  $('playBtn').textContent = state.playing ? 'PAUSE' : 'PLAY';
+  $('metaLine').textContent = `${state.year} · ${state.race.name} · ${state.race.circuit}`;
+  renderTower();
+  renderFeed();
+  renderProbs();
+  renderUndercut();
+  renderCharts();
+  renderEvidence();
+}
+
+function pause() {
+  state.playing = false;
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  $('playBtn').textContent = 'PLAY';
+}
+function play() {
+  if (!state.sim) return;
+  if (state.lap >= state.sim.total) state.lap = 1;
+  state.playing = true;
+  $('playBtn').textContent = 'PAUSE';
+  if (state.timer) clearInterval(state.timer);
+  state.timer = setInterval(() => {
+    if (!state.playing) return;
+    if (state.lap >= state.sim.total) { pause(); return; }
+    state.lap += 1;
+    state.uc.dirty = false;
+    state.uc.params = null;
+    renderAll();
+  }, 900 / state.speed);
+}
+function goToLap(lap) {
+  if (!state.sim) return;
+  state.lap = clamp(lap, 1, state.sim.total);
+  state.uc.dirty = false;
+  state.uc.params = null;
+  renderAll();
+}
+function setSpeed(speed) {
+  state.speed = speed;
+  document.querySelectorAll('.speed').forEach((b) => b.classList.toggle('active', Number(b.dataset.speed) === speed));
+  if (state.playing) play();
+}
+function selectFocus(id) {
+  if (!state.sim) return;
+  if (!state.sim.drivers.some((d) => d.id === id)) return;
+  state.focusId = id;
+  state.uc.dirty = false;
+  state.uc.params = null;
+  renderAll();
+}
+
+function populateSeasons() {
+  const sel = $('seasonSel');
+  sel.innerHTML = state.index.seasons.map((s) => `<option value="${s.year}">${s.year}</option>`).join('');
+}
+function populateRaces() {
+  const sel = $('raceSel');
+  sel.innerHTML = state.season.races.map((r) => `<option value="${r.id}">R${String(r.round).padStart(2, '0')} · ${esc(r.name)}</option>`).join('');
+}
+async function loadSeason(year) {
+  if (state.seasonCache.has(year)) return state.seasonCache.get(year);
+  const res = await fetch(`data/s${year}.json`);
+  if (!res.ok) throw new Error(`data/s${year}.json: ${res.status}`);
+  const data = await res.json();
+  state.seasonCache.set(year, data);
+  return data;
+}
+async function loadRace(raceId, lap = 1, focusId = null) {
+  const race = state.season.races.find((r) => r.id === Number(raceId));
+  if (!race) return;
+  state.raceId = race.id;
+  state.race = race;
+  state.sim = computeSim(race, state.season);
+  state.lap = clamp(lap, 1, state.sim.total);
+  state.focusId = focusId != null ? Number(focusId) : null;
+  state.aheadId = null;
+  state.uc.dirty = false;
+  state.uc.params = null;
+  state.evidenceDirty = true;
+  $('raceSel').value = String(race.id);
+  ensureFocus();
+  renderAll();
+}
+async function changeSeason(year) {
+  pause();
+  state.year = Number(year);
+  $('seasonSel').value = String(year);
+  state.season = await loadSeason(state.year);
+  populateRaces();
+  const def = state.index.default;
+  if (state.year === def.year) {
+    await loadRace(def.raceId, def.lap, def.focusId);
+  } else {
+    const first = state.season.races[0];
+    await loadRace(first.id, 1, null);
+  }
+}
+async function changeRace(raceId) {
+  pause();
+  await loadRace(raceId, 1, null);
+}
+
+function bootError(err) {
+  const el = $('boot');
+  el.innerHTML = `<div class="err">DATA COULD NOT LOAD<br><br>${esc(err.message)}<br><br>Serve this folder over HTTP:<br><span class="mono">python -m http.server 8000</span><br>then open <span class="mono">http://localhost:8000/</span></div>`;
+}
+
+async function boot() {
+  try {
+    const [index, model] = await Promise.all([
+      fetch('data/index.json').then((r) => { if (!r.ok) throw new Error(`data/index.json: ${r.status}`); return r.json(); }),
+      fetch('data/model.json').then((r) => { if (!r.ok) throw new Error(`data/model.json: ${r.status}`); return r.json(); }),
+    ]);
+    state.index = index;
+    state.model = model;
+    populateSeasons();
+    const def = index.default;
+    state.year = def.year;
+    $('seasonSel').value = String(def.year);
+    state.season = await loadSeason(def.year);
+    populateRaces();
+    $('boot').hidden = true;
+    $('main').hidden = false;
+    $('evidence').hidden = false;
+    $('footer').hidden = false;
+    $('footData').textContent = `${index.meta.raceCount} races, ${index.seasons.length} seasons, ${index.meta.lapCount.toLocaleString('en-US')} car-laps with lap times and pit stops. Source: ${index.source}.`;
+    await loadRace(def.raceId, def.lap, def.focusId);
+    bindUc();
+    // Keyboard and transport.
+    $('playBtn').addEventListener('click', () => state.playing ? pause() : play());
+    $('prevBtn').addEventListener('click', () => { pause(); goToLap(state.lap - 1); });
+    $('nextBtn').addEventListener('click', () => { pause(); goToLap(state.lap + 1); });
+    $('scrub').addEventListener('input', (e) => { pause(); goToLap(Number(e.target.value)); });
+    document.querySelectorAll('.speed').forEach((b) => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
+    $('seasonSel').addEventListener('change', (e) => changeSeason(e.target.value).catch(bootError));
+    $('raceSel').addEventListener('change', (e) => changeRace(e.target.value).catch(bootError));
+    $('themeBtn').addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = state.theme;
+      $('themeBtn').textContent = state.theme === 'dark' ? 'LIGHT' : 'DARK';
+      try { localStorage.setItem('pitwall-theme', state.theme); } catch (e) {}
+    });
+    try {
+      const saved = localStorage.getItem('pitwall-theme');
+      if (saved === 'light' || saved === 'dark') {
+        state.theme = saved;
+        document.documentElement.dataset.theme = saved;
+        $('themeBtn').textContent = saved === 'dark' ? 'LIGHT' : 'DARK';
+      }
+    } catch (e) {}
+    $('towerBody').addEventListener('click', (e) => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr) selectFocus(Number(tr.dataset.id));
+    });
+    $('towerBody').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tr = e.target.closest('tr[data-id]');
+      if (tr) { e.preventDefault(); selectFocus(Number(tr.dataset.id)); }
+    });
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (t && t.closest && t.closest('input, select, textarea, button')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); goToLap(state.lap - 1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); pause(); goToLap(state.lap + 1); }
+      else if (e.key === ' ') { e.preventDefault(); state.playing ? pause() : play(); }
+    });
+    let raf = null;
+    const onResize = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (!state.sim) return;
+        renderCharts();
+        state.evidenceDirty = true;
+        renderEvidence();
+        renderUndercut();
+      });
+    };
+    window.addEventListener('resize', onResize);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(onResize).catch(() => {});
+
+    window.PITWALL = {
+      state: () => ({
+        year: state.year, raceId: state.raceId, lap: state.lap, focusId: state.focusId,
+        aheadId: state.aheadId, total: state.sim ? state.sim.total : null,
+        playing: state.playing, speed: state.speed,
+      }),
+      debug: () => {
+        if (!state.sim) return null;
+        const sim = state.sim, lap = state.lap;
+        const running = orderAt(sim, lap);
+        const out = {
+          year: state.year, raceId: state.raceId, raceName: state.race.name, lap,
+          total: sim.total, focusId: state.focusId, aheadId: state.aheadId,
+          probs: {}, gaps: {}, intervals: {}, positions: {}, tyreAge: {}, stops: {}, features: {},
+        };
+        const model = state.model;
+        const leader = running[0];
+        const paceLead = leader ? leader.pace[lap] : NaN;
+        const medStops = median(running.map((d) => d.stopsBefore[lap]));
+        for (const d of running) {
+          const pos = d.pos[lap - 1];
+          const lapsLeft = sim.total - lap;
+          const gap = d.gap[lap];
+          const pace = d.pace[lap];
+          const paceDiff = (isFinite(pace) && isFinite(paceLead)) ? clamp((pace - paceLead) / 1000, -3, 5) : 0;
+          const f = [
+            Math.log(pos),
+            Math.log(pos) * lapsLeft / sim.total,
+            Math.min(gap, 300) / Math.sqrt(lapsLeft + 1),
+            paceDiff * Math.sqrt(lapsLeft + 1) / 10,
+            clamp(d.stopsBefore[lap] - medStops, -2, 2)
+          ];
+          const z = f.map((v, i) => (v - model.scaler.mean[i]) / model.scaler.std[i]);
+          out.probs[d.meta.code] = d.prob[lap];
+          out.gaps[d.meta.code] = gap;
+          out.intervals[d.meta.code] = d.interval[lap];
+          out.positions[d.meta.code] = pos;
+          out.tyreAge[d.meta.code] = ageAt(d, lap);
+          out.stops[d.meta.code] = d.stopsBefore[lap];
+          out.features[d.meta.code] = { f1: f[0], f2: f[1], f3: f[2], f4: f[3], f5: f[4], z };
+        }
+        return out;
+      },
+      go: (lap) => { pause(); goToLap(lap); },
+      play: () => play(),
+      pause: () => pause(),
+    };
+  } catch (err) {
+    bootError(err);
+  }
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
