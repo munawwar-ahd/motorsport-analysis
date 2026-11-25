@@ -19,9 +19,13 @@ Run:  python build_data.py
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
+import re
 import time
+import unicodedata
+import urllib.request
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
@@ -32,6 +36,109 @@ from scipy.optimize import minimize
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "data"
+RAW_CIRCUITS = ROOT / "raw_circuits"
+PORTRAIT_DIR = ROOT / "assets" / "drivers"
+
+# Circuit geometry is fetched once during the build and cached under raw_circuits/.
+# The browser only ever reads the compact paths written to data/index.json.
+GEOJSON_URL = "https://raw.githubusercontent.com/bacinger/f1-circuits/master/f1-circuits.geojson"
+SVG_INDEX_URL = "https://raw.githubusercontent.com/MisterSix2295/f1-circuits-svg/main/circuits.json"
+SVG_BASE_URL = "https://raw.githubusercontent.com/MisterSix2295/f1-circuits-svg/main/circuits/black"
+SVG_REF_ALIASES = {
+    "albert_park": "melbourne", "villeneuve": "montreal", "interlagos": "interlagos",
+    "nurburgring": "nurburgring", "red_bull_ring": "spielberg", "vegas": "las-vegas",
+    "zandvoort": "zandvoort", "yeongam": "yeongam", "buddh": "buddh",
+    "madring": None, "losail": "lusail", "portimao": "portimao",
+    "ricard": "paul-ricard", "mugello": "mugello", "rodriguez": "mexico-city",
+    "americas": "austin", "marina_bay": "marina-bay", "yas_marina": "yas-marina",
+    "monaco": "monaco", "spa": "spa-francorchamps", "monza": "monza",
+    "silverstone": "silverstone", "hockenheimring": "hockenheimring",
+    "hungaroring": "hungaroring", "sepang": "sepang", "bahrain": "bahrain",
+    "catalunya": "catalunya", "istanbul": "istanbul", "imola": "imola",
+    "suzuka": "suzuka", "shanghai": "shanghai", "sochi": "sochi",
+    "baku": "baku", "jeddah": "jeddah", "valencia": "valencia",
+}
+VIEW_W, VIEW_H, VIEW_PAD = 220.0, 130.0, 8.0
+TARGET_POINTS = 110
+
+# Official F1 constructor colours. The map covers every modern/legacy team ref in
+# constructors.csv; engine-badged variants inherit their base constructor's colour
+# via TEAM_TOKENS. Anything genuinely obscure gets a deterministic fallback below.
+TEAM_COLORS = {
+    # Current and modern era.
+    "ferrari": "#E8002D", "red_bull": "#3671C6", "mercedes": "#27F4D2",
+    "mclaren": "#FF8000", "aston_martin": "#229971", "alpine": "#00A1E8",
+    "williams": "#1868DB", "rb": "#6692FF", "alphatauri": "#2B4562",
+    "toro_rosso": "#469BFF", "sauber": "#52E252", "alfa": "#C92D4B",
+    "alfa_romeo": "#C92D4B", "haas": "#B6BABD", "audi": "#F50537",
+    "cadillac": "#909090", "renault": "#FFF500", "racing_point": "#F596C8",
+    "force_india": "#FF5F0F", "bmw_sauber": "#0047AB", "toyota": "#D71920",
+    "super_aguri": "#C8102E", "honda": "#E60012", "spyker": "#D4A017",
+    "spyker_mf1": "#D4A017", "mf1": "#C8102E", "bar": "#002D62",
+    "jordan": "#EED202", "benetton": "#00A86B", "brawn": "#B8FD6E",
+    "brabham": "#002855", "tyrrell": "#003399", "matra": "#0055A4",
+    "cooper": "#004225", "brm": "#004225", "vanwall": "#006633",
+    "maserati": "#C8102E", "team_lotus": "#FFB800", "lotus_f1": "#FFB800",
+    "lotus_racing": "#FFB800", "virgin": "#6F2DA8", "marussia": "#C8102E",
+    "caterham": "#006B3F", "manor": "#6F2DA8", "hrt": "#D2232A",
+    # Historic constructors with recognisable identities.
+    "minardi": "#404040", "jaguar": "#006EAA", "prost": "#002F6C",
+    "arrows": "#D2232A", "stewart": "#9E1B32", "lola": "#D7191C",
+    "ligier": "#002395", "forti": "#D32F2F", "footwork": "#0033A0",
+    "pacific": "#D2232A", "simtek": "#1D4ED8", "larrousse": "#F2C300",
+    "dallara": "#003DA5", "fondmetal": "#B22222", "march": "#0057B8",
+    "moda": "#C8102E", "ags": "#F2C300", "lambo": "#C8102E",
+    "leyton": "#006B3F", "coloni": "#005A9C", "eurobrun": "#C8102E",
+    "osella": "#C8102E", "onyx": "#003399", "life": "#C8102E",
+    "rial": "#1D4ED8", "zakspeed": "#C8102E", "ram": "#1D4ED8",
+    "spirit": "#1D4ED8", "toleman": "#D2232A", "ats": "#D2232A",
+    "theodore": "#D2232A", "fittipaldi": "#006B3F", "ensign": "#C8102E",
+    "shadow": "#D2232A", "wolf": "#C8102E", "merzario": "#C8102E",
+    "surtees": "#C8102E", "hesketh": "#C8102E", "martini": "#D2232A",
+    "penske": "#C8102E", "gordini": "#0055A4", "bugatti": "#C8102E",
+    "lancia": "#C8102E", "bmw": "#0066B2", "porsche": "#C8102E",
+    "eagle": "#C8102E", "de_tomaso": "#C8102E", "simca": "#0055A4",
+    "lago": "#0055A4",
+}
+# Longest tokens first so de_tomaso-alfa_romeo resolves to De Tomaso, not Alfa.
+TEAM_TOKENS = tuple(
+    sorted(
+        {
+            "de_tomaso": "#C8102E", "alfa_romeo": "#C92D4B", "alfaromeo": "#C92D4B",
+            "lotus": "#FFB800", "mclaren": "#FF8000", "brabham": "#002855",
+            "cooper": "#004225", "matra": "#0055A4", "shadow": "#D2232A",
+            "march": "#0057B8", "eagle": "#C8102E", "alfa": "#C92D4B",
+            "porsche": "#C8102E", "ferrari": "#E8002D", "maserati": "#C8102E",
+            "tomaso": "#C8102E", "brm": "#004225",
+        }.items(),
+        key=lambda kv: len(kv[0]), reverse=True,
+    )
+)
+FALLBACK_TEAM_COLORS = (
+    "#005A9C", "#B22222", "#006B3F", "#8A6D00",
+    "#6A1B9A", "#00796B", "#A1006B", "#37474F",
+)
+
+
+def constructor_color(ref: str | None, name: str | None = None) -> str:
+    """Official hex for a constructorRef, with a stable fallback for obscure teams."""
+    key = str(ref or "")
+    if key in TEAM_COLORS:
+        return TEAM_COLORS[key]
+    flat = re.sub(r"[^a-z0-9]+", "", key.lower())
+    for token, color in TEAM_TOKENS:
+        if re.sub(r"[^a-z0-9]+", "", token.lower()) in flat:
+            return color
+    digest = hashlib.sha256(key.encode("utf-8")).digest()
+    return FALLBACK_TEAM_COLORS[digest[0] % len(FALLBACK_TEAM_COLORS)]
+
+
+def all_constructor_colors(constructors: pd.DataFrame) -> dict[str, str]:
+    """Every constructorRef in constructors.csv, including historical one-off entries."""
+    return {
+        str(row.constructorRef): constructor_color(str(row.constructorRef), str(row.name))
+        for row in constructors.itertuples(index=False)
+    }
 
 # A stop with a larger lane time than this is not a normal green stop.
 PIT_LOSS_MIN = 5.0
@@ -102,6 +209,443 @@ def fmt_driver_code(row) -> str:
     surname = str(row.get("surname", "")).strip().upper()
     clean = "".join(ch for ch in surname if ch.isalpha())
     return (clean[:3] or "???").ljust(3, "?")
+
+
+def cached_download(url: str, path: Path, label: str) -> str | None:
+    """Fetch once into raw_circuits/ so later builds (and the page) are offline."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.stat().st_size:
+        return path.read_text(encoding="utf-8")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "PITWALL build/1.0"})
+        with urllib.request.urlopen(req, timeout=45) as response:
+            text = response.read().decode("utf-8")
+        path.write_text(text, encoding="utf-8")
+        print(f"cached {label}: {path.name} ({len(text)} chars)")
+        return text
+    except Exception as exc:
+        print(f"WARNING: could not fetch {label}: {exc}")
+        return None
+
+
+def norm_key(value) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]", "", text)
+
+
+def has_portrait(driver_ref) -> bool:
+    if not driver_ref or not isinstance(driver_ref, str):
+        return False
+    return (PORTRAIT_DIR / f"{driver_ref}.png").is_file()
+
+
+def ramer_douglas_peucker(points: list[tuple[float, float]], eps: float) -> list[tuple[float, float]]:
+    if len(points) < 3:
+        return list(points)
+    ax, ay = points[0]
+    bx, by = points[-1]
+    dx, dy = bx - ax, by - ay
+    den = dx * dx + dy * dy
+    farthest, best = 0, 0.0
+    for i in range(1, len(points) - 1):
+        px, py = points[i]
+        dist = math.hypot(px - ax, py - ay) if den == 0 else abs(dy * px - dx * py + bx * ay - by * ax) / math.sqrt(den)
+        if dist > best:
+            farthest, best = i, dist
+    if best > eps:
+        return ramer_douglas_peucker(points[: farthest + 1], eps)[:-1] + ramer_douglas_peucker(points[farthest:], eps)
+    return [points[0], points[-1]]
+
+
+def simplify_track(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Binary-search the tolerance so each track stays near TARGET_POINTS vertices."""
+    lo, hi = 0.02, 8.0
+    best = ramer_douglas_peucker(points, lo)
+    for _ in range(14):
+        mid = (lo + hi) / 2.0
+        trial = ramer_douglas_peucker(points, mid)
+        if abs(len(trial) - TARGET_POINTS) < abs(len(best) - TARGET_POINTS):
+            best = trial
+        if len(trial) > TARGET_POINTS:
+            lo = mid
+        else:
+            hi = mid
+    if len(best) > 150:
+        step = math.ceil(len(best) / 150)
+        best = best[::step]
+    if best[0] != best[-1]:
+        best.append(best[0])
+    return best
+
+
+def fit_to_viewbox(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Uniform scaling, centred in the 220x130 viewBox with a small margin."""
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    w, h = max(xs) - min(xs), max(ys) - min(ys)
+    sx = (VIEW_W - 2 * VIEW_PAD) / w if w > 0 else 0.0
+    sy = (VIEW_H - 2 * VIEW_PAD) / h if h > 0 else 0.0
+    scale = min(sx, sy) if sx > 0 and sy > 0 else 1.0
+    ox = (VIEW_W - w * scale) / 2.0 - min(xs) * scale
+    oy = (VIEW_H - h * scale) / 2.0 - min(ys) * scale
+    return [(round(x * scale + ox, 2), round(y * scale + oy, 2)) for x, y in points]
+
+
+def project_lat_lng(coords: list[list[float]]) -> list[tuple[float, float]]:
+    lat0 = math.radians(float(np.median([c[1] for c in coords])))
+    factor = math.cos(lat0)
+    return [(float(c[0]) * factor, float(c[1])) for c in coords]
+
+
+def sf_tick(points: list[tuple[float, float]]) -> list[float]:
+    x0, y0 = points[0]
+    x1, y1 = next((p for p in points[1:] if p != (x0, y0)), (x0 + 1.0, y0))
+    dx, dy = x1 - x0, y1 - y0
+    length = math.hypot(dx, dy) or 1.0
+    nx, ny = -dy / length * 5.0, dx / length * 5.0
+    return [round(x0 - nx, 2), round(y0 - ny, 2), round(x0 + nx, 2), round(y0 + ny, 2)]
+
+
+def layout_from_points(points: list[tuple[float, float]], source: str) -> dict:
+    fitted = fit_to_viewbox(points)
+    simple = simplify_track(fitted)
+    path = "M" + " L".join(f"{x:.2f},{y:.2f}" for x, y in simple) + " Z"
+    return {"svg_path": path, "sf_line": sf_tick(simple), "points": len(simple), "source": source}
+
+
+def parse_svg_path(data: str) -> list[tuple[float, float]]:
+    """Flatten the M/h/l/s/c/q SVG commands used by the cached layout files."""
+    tokens = re.findall(r"[MmLlHhVvCcSsQqTtAaZz]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?", data)
+    pts: list[tuple[float, float]] = []
+    i = 0
+    cur = start = (0.0, 0.0)
+    prev_c2 = None
+    cmd = None
+
+    def take(n: int) -> list[float] | None:
+        nonlocal i
+        if i + n > len(tokens):
+            return None
+        out = []
+        for _ in range(n):
+            if re.match(r"^[A-Za-z]$", tokens[i]):
+                return None
+            out.append(float(tokens[i]))
+            i += 1
+        return out
+
+    def relpair(vals: list[float]) -> tuple[float, float]:
+        return (vals[0] + cur[0], vals[1] + cur[1]) if cmd and cmd.islower() else (vals[0], vals[1])
+
+    def cubic(c1, c2, end, samples=5):
+        nonlocal cur
+        for k in range(1, samples + 1):
+            t = k / samples
+            u = 1.0 - t
+            pts.append((
+                u ** 3 * cur[0] + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t ** 3 * end[0],
+                u ** 3 * cur[1] + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t ** 3 * end[1],
+            ))
+
+    while i < len(tokens):
+        if re.match(r"^[A-Za-z]$", tokens[i]):
+            cmd = tokens[i]
+            i += 1
+        if not cmd:
+            break
+        upper = cmd.upper()
+        if upper == "Z":
+            pts.append(start)
+            cur = start
+            cmd = None
+            continue
+        if upper == "M":
+            vals = take(2)
+            if vals is None:
+                break
+            cur = relpair(vals)
+            start = cur
+            pts.append(cur)
+            cmd = "l" if cmd.islower() else "L"
+            continue
+        if upper == "L":
+            vals = take(2)
+            if vals is None:
+                break
+            cur = relpair(vals)
+            pts.append(cur)
+            prev_c2 = None
+        elif upper in ("H", "V"):
+            vals = take(1)
+            if vals is None:
+                break
+            v = vals[0] + (cur[0] if upper == "H" else cur[1]) if cmd.islower() else vals[0]
+            cur = (v, cur[1]) if upper == "H" else (cur[0], v)
+            pts.append(cur)
+            prev_c2 = None
+        elif upper == "C":
+            vals = take(6)
+            if vals is None:
+                break
+            pairs = [relpair(vals[j:j + 2]) for j in (0, 2, 4)]
+            cubic(pairs[0], pairs[1], pairs[2])
+            prev_c2, cur = pairs[1], pairs[2]
+        elif upper == "S":
+            vals = take(4)
+            if vals is None:
+                break
+            c2, end = relpair(vals[0:2]), relpair(vals[2:4])
+            c1 = (2 * cur[0] - prev_c2[0], 2 * cur[1] - prev_c2[1]) if prev_c2 else cur
+            cubic(c1, c2, end)
+            prev_c2, cur = c2, end
+        elif upper == "Q":
+            vals = take(4)
+            if vals is None:
+                break
+            q, end = relpair(vals[0:2]), relpair(vals[2:4])
+            c1 = (cur[0] + 2 * (q[0] - cur[0]) / 3, cur[1] + 2 * (q[1] - cur[1]) / 3)
+            c2 = (end[0] + 2 * (q[0] - end[0]) / 3, end[1] + 2 * (q[1] - end[1]) / 3)
+            cubic(c1, c2, end)
+            prev_c2, cur = q, end
+        elif upper == "T":
+            vals = take(2)
+            if vals is None:
+                break
+            end = relpair(vals)
+            q = (2 * cur[0] - prev_c2[0], 2 * cur[1] - prev_c2[1]) if prev_c2 else cur
+            c1 = (cur[0] + 2 * (q[0] - cur[0]) / 3, cur[1] + 2 * (q[1] - cur[1]) / 3)
+            c2 = (end[0] + 2 * (q[0] - end[0]) / 3, end[1] + 2 * (q[1] - end[1]) / 3)
+            cubic(c1, c2, end)
+            prev_c2, cur = q, end
+        elif upper == "A":
+            vals = take(7)
+            if vals is None:
+                break
+            rx, ry, angle, large, sweep = vals[:5]
+            end = relpair(vals[5:7])
+            x0, y0 = cur
+            if rx == 0 or ry == 0 or end == cur:
+                cur = end
+                pts.append(cur)
+                prev_c2 = None
+                continue
+            phi = math.radians(angle % 180.0)
+            cosp, sinp = math.cos(phi), math.sin(phi)
+            dx2, dy2 = (x0 - end[0]) / 2.0, (y0 - end[1]) / 2.0
+            x1p, y1p = cosp * dx2 + sinp * dy2, -sinp * dx2 + cosp * dy2
+            scale = x1p * x1p / (rx * rx) + y1p * y1p / (ry * ry)
+            if scale > 1.0:
+                rx *= math.sqrt(scale)
+                ry *= math.sqrt(scale)
+            num = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p
+            den = rx * rx * y1p * y1p + ry * ry * x1p * x1p
+            coef = math.sqrt(max(0.0, num / den)) if den else 0.0
+            sign = -1.0 if bool(large) == bool(sweep) else 1.0
+            cxp, cyp = sign * coef * rx * y1p / ry, -sign * coef * ry * x1p / rx
+            cx = cosp * cxp - sinp * cyp + (x0 + end[0]) / 2.0
+            cy = sinp * cxp + cosp * cyp + (y0 + end[1]) / 2.0
+            theta1 = math.atan2((y1p - cyp) / ry, (x1p - cxp) / rx)
+            theta2 = math.atan2((-y1p - cyp) / ry, (-x1p - cxp) / rx)
+            delta = theta2 - theta1
+            if sweep == 0 and delta > 0:
+                delta -= 2 * math.pi
+            elif sweep != 0 and delta < 0:
+                delta += 2 * math.pi
+            for k in range(1, 6):
+                theta = theta1 + delta * k / 5.0
+                pts.append((
+                    cosp * rx * math.cos(theta) - sinp * ry * math.sin(theta) + cx,
+                    sinp * rx * math.cos(theta) + cosp * ry * math.sin(theta) + cy,
+                ))
+            cur = end
+            prev_c2 = None
+        else:
+            break
+    return pts
+
+
+def build_circuit_layouts(circuits: pd.DataFrame, replay_ids: set[int]) -> dict:
+    """GeoJSON layouts plus cached era-specific SVG layouts, keyed by circuitId."""
+    geo_text = cached_download(GEOJSON_URL, RAW_CIRCUITS / "f1-circuits.geojson", "circuit GeoJSON")
+    svg_text = cached_download(SVG_INDEX_URL, RAW_CIRCUITS / "svg-circuits.json", "SVG circuit index")
+    features = json.loads(geo_text).get("features", []) if geo_text else []
+    svg_index = {c["id"]: c for c in json.loads(svg_text)} if svg_text else {}
+    geo_by_id = {str(f["properties"].get("id", "")): f for f in features}
+    geo_by_name = {norm_key(f["properties"].get("Name")): f for f in features}
+    geo_by_location = {norm_key(f["properties"].get("Location")): f for f in features}
+    geo_aliases = {
+        "albert_park": "au-1953", "villeneuve": "ca-1978", "interlagos": "br-1940",
+        "nurburgring": "de-1927", "red_bull_ring": "at-1969", "vegas": "us-2023",
+        "madring": "es-2026", "losail": "qa-2004", "portimao": "pt-2008",
+        "ricard": "fr-1969", "mugello": "it-1914", "rodriguez": "mx-1962",
+        "americas": "us-2012", "marina_bay": "sg-2008", "yas_marina": "ae-2009",
+        "monaco": "mc-1929", "spa": "be-1925", "monza": "it-1922",
+        "silverstone": "gb-1948", "hockenheimring": "de-1932", "hungaroring": "hu-1986",
+        "sepang": "my-1999", "bahrain": "bh-2002", "catalunya": "es-1991",
+        "istanbul": "tr-2005", "imola": "it-1953", "suzuka": "jp-1962",
+        "shanghai": "cn-2004", "sochi": "ru-2014", "baku": "az-2016",
+        "jeddah": "sa-2021", "buddh": None, "yeongam": None, "valencia": None,
+    }
+    out: dict[str, dict] = {}
+    total_eras = 0
+    for row in circuits[circuits.circuitId.isin(replay_ids)].itertuples(index=False):
+        cid = int(row.circuitId)
+        ref = str(row.circuitRef)
+        feature = geo_by_id.get(geo_aliases.get(ref, "")) or geo_by_name.get(norm_key(row.name))
+        if feature is None:
+            feature = geo_by_location.get(norm_key(row.location))
+        primary = None
+        if feature and feature.get("geometry", {}).get("coordinates"):
+            coords = feature["geometry"]["coordinates"]
+            if isinstance(coords[0], list) and isinstance(coords[0][0], list):
+                coords = coords[0]
+            points = project_lat_lng(coords)
+            if len(points) >= 4:
+                primary = layout_from_points(points, "bacinger/f1-circuits GeoJSON")
+        eras = []
+        svg_id = SVG_REF_ALIASES.get(ref, norm_key(ref))
+        svg_circuit = svg_index.get(svg_id)
+        if svg_circuit:
+            for layout in svg_circuit.get("layouts", []):
+                layout_id = str(layout["layoutId"])
+                cached = cached_download(
+                    f"{SVG_BASE_URL}/{layout_id}.svg",
+                    RAW_CIRCUITS / "svg" / f"{layout_id}.svg",
+                    f"layout {layout_id}",
+                )
+                match = re.search(r'<path[^>]*\bd="([^"]+)"', cached or "")
+                if not match:
+                    continue
+                points = parse_svg_path(match.group(1))
+                if len(points) < 4:
+                    continue
+                season_years = [int(v) for v in re.findall(r"\d{4}", str(layout["seasons"]))]
+                if not season_years:
+                    continue
+                entry = {"from": min(season_years), "to": max(season_years)}
+                entry.update(layout_from_points(points, "f1-circuits-svg"))
+                entry["layoutId"] = layout_id
+                eras.append(entry)
+        if not primary and eras:
+            latest = eras[-1]
+            primary = {k: latest[k] for k in ("svg_path", "sf_line", "points", "source")}
+        out[str(cid)] = {
+            "id": cid,
+            "ref": ref,
+            "name": str(row.name),
+            "location": str(row.location),
+            "country": str(row.country),
+            "fallback": primary is None,
+            **(primary or {"svg_path": "", "sf_line": [], "points": 0, "source": "unavailable"}),
+            "eras": eras,
+        }
+        total_eras += len(eras)
+    print(
+        f"circuit layouts: {sum(1 for v in out.values() if not v['fallback'])}/{len(out)} tracks, "
+        f"{total_eras} era variants"
+    )
+    return out
+
+
+def build_champions(races, standings_d, standings_c, results, drivers, constructors, seasons_out):
+    """Final-round champions for every season in the archive, 1950-2026."""
+    drv = drivers.set_index("driverId")
+    con = constructors.set_index("constructorId")
+    race_year = races[["raceId", "year", "round"]].copy()
+    finals = race_year.sort_values(["year", "round"]).groupby("year").tail(1)
+    joined = results.merge(race_year[["raceId", "year"]], on="raceId", how="left")
+    pos_order = pd.to_numeric(joined.positionOrder, errors="coerce")
+    joined = joined.assign(pos=pos_order)
+    team_by_driver = (
+        joined[joined.pos.notna()]
+        .groupby(["year", "driverId"])["constructorId"]
+        .agg(lambda s: int(s.mode().iloc[0]) if len(s.mode()) else int(s.iloc[0]))
+        .to_dict()
+    )
+    driver_wins = joined[joined.pos == 1].groupby(["year", "driverId"]).size().to_dict()
+    driver_podiums = joined[joined.pos <= 3].groupby(["year", "driverId"]).size().to_dict()
+    constructor_wins = joined[joined.pos == 1].groupby(["year", "constructorId"]).size().to_dict()
+
+    sd = standings_d.merge(race_year, on="raceId", how="left")
+    sc = standings_c.merge(race_year, on="raceId", how="left")
+    sd["pos_num"] = pd.to_numeric(sd.position, errors="coerce")
+    sc["pos_num"] = pd.to_numeric(sc.position, errors="coerce")
+
+    replay_years = {int(s["year"]): s for s in seasons_out}
+    out = []
+    for year in sorted(race_year.year.unique()):
+        year = int(year)
+        final_race = finals[finals.year == year].iloc[0]
+        dyear = sd[sd.year == year]
+        cyear = sc[sc.year == year]
+        # Some seasons (notably the incomplete 2026 archive) stop before the last round.
+        dround = int(dyear["round"].max()) if len(dyear) else None
+        cround = int(cyear["round"].max()) if len(cyear) else None
+        dtop = dyear[dyear["round"] == dround].sort_values(["pos_num", "points"], ascending=[True, False]) if dround else dyear.iloc[0:0]
+        dnext = dtop[dtop.pos_num == 2]
+        dchamp = dtop[dtop.pos_num == 1]
+        ctop = cyear[cyear["round"] == cround].sort_values(["pos_num", "points"], ascending=[True, False]) if cround else cyear.iloc[0:0]
+        cchamp = ctop[ctop.pos_num == 1]
+        driver = None
+        if len(dchamp):
+            row = dchamp.iloc[0]
+            did = int(row.driverId)
+            drow = drv.loc[did] if did in drv.index else None
+            ref = str(drow.driverRef) if drow is not None else None
+            team_id = team_by_driver.get((year, did))
+            crow = con.loc[team_id] if team_id in con.index else None
+            team = str(crow["name"]) if crow is not None else "—"
+            team_ref = str(crow["constructorRef"]) if crow is not None else None
+            team_color = constructor_color(team_ref, team)
+            points = rnd(float(row.points), 1) if pd.notna(row.points) else None
+            margin = None
+            if points is not None and len(dnext):
+                runner_points = float(dnext.iloc[0].points) if pd.notna(dnext.iloc[0].points) else None
+                if runner_points is not None:
+                    margin = rnd(points - runner_points, 1)
+            driver = {
+                "driverId": did,
+                "driverRef": ref,
+                "code": fmt_driver_code(drow) if drow is not None else "—",
+                "name": f"{drow.forename} {drow.surname}".strip() if drow is not None else f"Driver {did}",
+                "nationality": str(drow.nationality) if drow is not None else "",
+                "constructor": team,
+                "constructorRef": team_ref,
+                "color": team_color,
+                "points": points,
+                "wins": int(driver_wins.get((year, did), 0)),
+                "podiums": int(driver_podiums.get((year, did), 0)),
+                "margin": margin,
+                "has_img": has_portrait(ref),
+            }
+        constructor = None
+        if len(cchamp):
+            row = cchamp.iloc[0]
+            cid = int(row.constructorId)
+            crow = con.loc[cid] if cid in con.index else None
+            ref = str(crow["constructorRef"]) if crow is not None else None
+            cname = str(crow["name"]) if crow is not None else f"Constructor {cid}"
+            constructor = {
+                "constructorId": cid,
+                "constructorRef": ref,
+                "name": cname,
+                "nationality": str(crow["nationality"]) if crow is not None else "",
+                "color": constructor_color(ref, cname),
+                "points": rnd(float(row.points), 1) if pd.notna(row.points) else None,
+                "wins": int(constructor_wins.get((year, cid), 0)),
+            }
+        replay = replay_years.get(year)
+        default_race_id = int(replay["races"][-1]["id"]) if replay and replay["races"] else None
+        out.append({
+            "year": year,
+            "driver": driver,
+            "constructor": constructor,
+            "has_replay": bool(replay),
+            "default_race_id": default_race_id,
+            "standings_race_id": int(final_race.raceId) if (dround == int(final_race["round"]) or cround == int(final_race["round"])) else None,
+            "standings_round": dround,
+        })
+    return out
 
 
 def process_race(
@@ -280,14 +824,16 @@ def process_race(
 
     for i, d in enumerate(driver_ids):
         drow = drivers_df.loc[drivers_df.driverId == d]
+        ref = None
         if len(drow):
             dr = drow.iloc[0]
             code = fmt_driver_code(dr)
             name = f"{dr.forename} {dr.surname}".strip()
+            ref = str(dr.driverRef)
         else:
             code = "???"
             name = f"Driver {d}"
-        season_driver_meta[str(d)] = {"code": code, "name": name}
+        season_driver_meta[str(d)] = {"code": code, "name": name, "driverRef": ref}
 
         res_row = res_by_driver.get(d)
         no_result = res_row is None
@@ -319,10 +865,16 @@ def process_race(
                 else:
                     team_source = "unknown"
         team = "Unknown"
+        team_ref = None
+        team_color = constructor_color(None, team)
         if team_id is not None:
             crow = constructors_df.loc[constructors_df.constructorId == team_id]
             if len(crow):
                 team = str(crow.iloc[0]["name"])
+                team_ref = str(crow.iloc[0]["constructorRef"])
+                team_color = constructor_color(team_ref, team)
+        season_driver_meta[str(d)]["constructorRef"] = team_ref
+        season_driver_meta[str(d)]["color"] = team_color
 
         result = None
         if res_row is not None:
@@ -610,6 +1162,8 @@ def main():
     circuits = read_csv("circuits.csv")
     status = read_csv("status.csv")
     qualifying = read_csv("qualifying.csv")
+    driver_standings = read_csv("driver_standings.csv")
+    constructor_standings = read_csv("constructor_standings.csv")
 
     lap_times["racerId"] = lap_times.raceId
     lap_times["milliseconds"] = pd.to_numeric(lap_times["milliseconds"], errors="coerce")
@@ -632,6 +1186,7 @@ def main():
     ].sort_values(["year", "round"])
     valid = valid.copy()
     race_ids = [int(v) for v in valid.raceId]
+    ref_by_id = {int(r.driverId): str(r.driverRef) for r in drivers.itertuples(index=False)}
     print(f"races: {len(race_ids)}  years: {valid.year.min()}-{valid.year.max()}")
 
     lap_by_race = {int(k): v for k, v in lap_times.groupby("raceId")}
@@ -660,6 +1215,8 @@ def main():
             rid, race_row, x, p, r, drivers, constructors, q, last_team
         )
         year = int(race_row.year)
+        for driver_id, driver_meta in dmeta.items():
+            driver_meta["has_img"] = has_portrait(ref_by_id.get(int(driver_id)))
         seasons[year]["year"] = year
         seasons[year]["drivers"].update(dmeta)
         seasons[year]["races"].append(race_json)
@@ -876,10 +1433,28 @@ def main():
             json.dump(out, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         print(f"wrote s{year}.json  {len(s['races'])} races  drivers {len(s['drivers'])}")
 
+    champions = build_champions(
+        races, driver_standings, constructor_standings, results, drivers, constructors, seasons_out
+    )
+    replay_circuit_ids = {int(v) for v in valid.circuitId.unique()}
+    circuit_layouts = build_circuit_layouts(circuits, replay_circuit_ids)
+    portrait_count = len(list(PORTRAIT_DIR.glob("*.png"))) if PORTRAIT_DIR.exists() else 0
+    constructor_colors = all_constructor_colors(constructors)
+    print(
+        f"champions: {len(champions)} seasons, "
+        f"{sum(1 for c in champions if c['driver'])} drivers, "
+        f"{sum(1 for c in champions if c['constructor'])} constructors; portraits {portrait_count}"
+    )
+    print(f"constructor colors: {len(constructor_colors)} refs mapped")
+
     index = {
         "generated": str(date.today()),
         "source": "Ergast-style CSV archive",
         "seasons": seasons_out,
+        "champions": champions,
+        "constructorColors": constructor_colors,
+        "circuitLayouts": circuit_layouts,
+        "driverImages": {"dir": "assets/drivers", "size": 160, "count": portrait_count},
         "default": {
             "year": default_year,
             "raceId": default_rid,

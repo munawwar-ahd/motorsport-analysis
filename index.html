@@ -5,14 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIT WALL — F1 strategy replay</title>
 <link rel="icon" href="data:,">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#000; --panel:#111; --hair:#333; --sec:#888; --tert:#bbb; --fg:#fff;
-    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --sans:'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+    --mono:ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    --sans:system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
   [data-theme="light"]{
     --bg:#fff; --panel:#eee; --hair:#ccc; --sec:#777; --tert:#444; --fg:#000;
@@ -63,8 +60,8 @@
   .hint{font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--sec);white-space:nowrap}
 
   input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent;cursor:pointer;margin:0;padding:0}
-  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--hair)}
-  input[type=range]::-moz-range-track{height:1px;background:var(--hair)}
+  input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--sec)}
+  input[type=range]::-moz-range-track{height:1px;background:var(--sec)}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:8px;height:8px;background:var(--fg);border:0;border-radius:0;margin-top:-3.5px}
   input[type=range]::-moz-range-thumb{width:8px;height:8px;background:var(--fg);border:0;border-radius:0}
   input[type=range]:disabled{opacity:.35;cursor:not-allowed}
@@ -90,7 +87,8 @@
   .tower tr{cursor:pointer}
   .tower tr:hover td{background:var(--bg)}
   .tower tr.focus td{background:var(--bg);border-top:1px solid var(--fg);border-bottom:1px solid var(--fg)}
-  .tower tr.focus td:first-child{border-left:2px solid var(--fg);padding-left:4px}
+  .tower td:first-child{border-left:2px solid var(--team,var(--hair))}
+  .tower tr.focus td:first-child{border-left:3px solid var(--team,var(--fg));padding-left:3px;box-shadow:inset 2px 0 0 var(--fg)}
   .tower tr.focus td:last-child{border-right:1px solid var(--fg)}
   .tower tr.focus .code{font-weight:600}
   .tower .code{font-size:10px;letter-spacing:.02em}
@@ -99,7 +97,7 @@
   .tower .gap{color:var(--fg)}
   .tower .dim{color:var(--sec)}
   .tower .tyre{color:var(--tert)}
-  .tower col.c-p{width:26px}.tower col.c-code{width:44px}.tower col.c-gap{width:58px}.tower col.c-int{width:48px}.tower col.c-last{width:60px}.tower col.c-tyre{width:36px}.tower col.c-win{width:46px}
+  .tower col.c-p{width:24px}.tower col.c-code{width:56px}.tower col.c-gap{width:54px}.tower col.c-int{width:44px}.tower col.c-last{width:58px}.tower col.c-tyre{width:34px}.tower col.c-win{width:44px}
   .tower-foot{padding:7px 10px;font-size:9px;line-height:1.5;color:var(--sec);border-top:1px solid var(--hair)}
   .tower-foot b{font-weight:500;color:var(--tert)}
 
@@ -118,11 +116,12 @@
   .prob-row{display:grid;grid-template-columns:32px minmax(0,1fr) 42px;align-items:center;gap:6px;height:18px;padding:0 2px}
   .prob-row .code{font-family:var(--mono);font-size:9px;color:var(--tert);white-space:nowrap}
   .prob-track{height:6px;background:var(--bg);border:1px solid var(--hair);position:relative;min-width:0}
-  .prob-fill{height:4px;background:var(--hair);margin-top:0;min-width:0}
-  .prob-row.other .prob-fill{background:var(--sec);opacity:.7}
-  .prob-row.focus .prob-fill{background:var(--fg);opacity:1}
+  .prob-fill{height:4px;background:var(--team,var(--hair));margin-top:0;min-width:0;opacity:.88}
+  .prob-row .code{border-left:2px solid var(--team,transparent);padding-left:3px}
+  .prob-row.other .prob-fill{opacity:.78}
+  .prob-row.focus .prob-fill{background:var(--team,var(--fg));opacity:1}
   .prob-row.ahead .prob-track{border:1px dashed var(--fg)}
-  .prob-row.ahead .prob-fill{background:var(--tert)}
+  .prob-row.ahead .prob-fill{background:var(--team,var(--tert));opacity:1}
   .prob-row.focus .code,.prob-row.ahead .code{color:var(--fg)}
   .prob-row .pct{font-family:var(--mono);font-size:10px;text-align:right;color:var(--tert)}
   .prob-row.focus .pct{color:var(--fg);font-weight:500}
@@ -186,20 +185,23 @@
   .axis-label-strong{fill:var(--tert);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
   .neutral-band{fill:var(--hair);opacity:.55}
   .neutral-text{fill:var(--sec);font-family:var(--mono);font-size:6.5px;letter-spacing:.06em}
-  .series-other{fill:none;stroke:var(--sec);stroke-width:1;opacity:.42;stroke-linejoin:round;stroke-linecap:round}
-  .series-focus{fill:none;stroke:var(--fg);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
-  .series-ahead{fill:none;stroke:var(--fg);stroke-width:1.7;stroke-dasharray:5 4;stroke-linejoin:round;stroke-linecap:round}
+  .series-other{fill:none;stroke:var(--series,var(--sec));stroke-width:1;opacity:.58;stroke-linejoin:round;stroke-linecap:round}
+  .series-focus{fill:none;stroke:var(--series,var(--fg));stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+  .series-ahead{fill:none;stroke:var(--series,var(--fg));stroke-width:1.7;stroke-dasharray:5 4;stroke-linejoin:round;stroke-linecap:round}
   .series-label{fill:var(--fg);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
   .series-label-muted{fill:var(--sec);font-family:var(--mono);font-size:7.5px;letter-spacing:.03em}
-  .ols-line{fill:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:2 3;opacity:.8}
+  .ols-line{fill:none;stroke:var(--series,var(--fg));stroke-width:1;stroke-dasharray:2 3;opacity:.8}
   .now-line{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
   .now-label{fill:var(--sec);font-family:var(--mono);font-size:7px;letter-spacing:.04em}
-  .stint-other-even{fill:var(--hair)}
-  .stint-other-odd{fill:var(--sec);opacity:.6}
-  .stint-focus{fill:var(--fg)}
-  .stint-ahead{fill:var(--tert);opacity:.75}
+  .stint-other-even{fill:var(--team,var(--hair));opacity:.62}
+  .stint-other-odd{fill:var(--team,var(--sec));opacity:.72}
+  .stint-focus{fill:var(--team,var(--fg));opacity:1}
+  .stint-ahead{fill:var(--team,var(--tert));opacity:.85}
   .pit-tick{stroke:var(--fg);stroke-width:1}
   .pit-tick-muted{stroke:var(--tert);stroke-width:1;opacity:.75}
+  /* Keep the original team hue readable on either inverted background. */
+  html[data-theme="light"] .series-other,html[data-theme="light"] .series-focus,html[data-theme="light"] .series-ahead,html[data-theme="light"] .ols-line,html[data-theme="light"] .stint-other-even,html[data-theme="light"] .stint-other-odd,html[data-theme="light"] .stint-focus,html[data-theme="light"] .stint-ahead{filter:brightness(.82)}
+  html[data-theme="dark"] .series-other,html[data-theme="dark"] .series-focus,html[data-theme="dark"] .series-ahead,html[data-theme="dark"] .ols-line,html[data-theme="dark"] .stint-other-even,html[data-theme="dark"] .stint-other-odd,html[data-theme="dark"] .stint-focus,html[data-theme="dark"] .stint-ahead{filter:brightness(1.12)}
   .cal-diag{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
   .cal-line{fill:none;stroke:var(--fg);stroke-width:1}
   .cal-dot{fill:var(--fg)}
@@ -212,6 +214,67 @@
   .fallback-line{stroke:var(--tert);stroke-width:1;stroke-dasharray:4 3}
   .verdict-line{stroke:var(--sec);stroke-width:1;stroke-dasharray:2 3}
   .uc-dot{fill:var(--fg)}
+
+  /* View switcher, portraits and circuit layout ------------------------------ */
+  .viewbar{display:flex;flex:0 0 auto;gap:0;align-items:flex-end}
+  .viewbar .btn{border-right:0;font-size:9px}
+  .viewbar .btn:last-child{border-right:1px solid var(--hair)}
+  .viewbar .btn.active{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+  .viewbar .btn.active + .btn{border-left:0}
+  .focus-badge{display:inline-flex;align-items:center;gap:5px;min-width:0;padding:2px 5px;border:1px solid var(--hair);font-family:var(--mono);font-size:9px;letter-spacing:.04em;color:var(--tert);white-space:nowrap}
+  .focus-badge .fname{color:var(--sec);overflow:hidden;text-overflow:ellipsis;max-width:110px}
+  .driver-img{display:inline-block;width:15px;height:15px;flex:none;object-fit:cover;border-radius:50%;background:var(--panel);vertical-align:middle}
+  .portrait-champ{width:26px;height:26px;border:1px solid var(--hair)}
+  .focus-badge .driver-img{width:17px;height:17px}
+  .mono-badge{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;flex:none;border:1px solid var(--hair);border-radius:50%;font-family:var(--mono);font-size:6px;line-height:1;letter-spacing:.02em;color:var(--tert)}
+  .portrait-champ.mono-badge{width:26px;height:26px;font-size:8px}
+  .focus-badge .mono-badge{width:17px;height:17px;font-size:6px}
+  .driver-cell{display:flex;align-items:center;gap:4px;min-width:0}
+  .driver-cell .dcode{overflow:hidden;text-overflow:ellipsis}
+  body[data-view="champions"] .selectors,
+  body[data-view="champions"] .transport,
+  body[data-view="champions"] .scrubrow{display:none}
+  .circuit-body{padding:6px 8px 4px}
+  .circuit-layout{display:block;width:100%;height:auto;color:var(--fg)}
+  .circuit-track{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linejoin:round;stroke-linecap:round}
+  .circuit-sf{stroke:currentColor;stroke-width:2;shape-rendering:crispEdges}
+  .circuit-fallback{display:flex;align-items:center;justify-content:center;height:104px;border:1px dashed var(--hair);font-family:var(--mono);font-size:9px;letter-spacing:.09em;color:var(--sec)}
+  .circuit-meta{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;padding:7px 10px;border-top:1px solid var(--hair)}
+  .circuit-meta div{min-width:0}
+  .circuit-meta span{display:block;font-family:var(--mono);font-size:7px;letter-spacing:.06em;color:var(--sec);text-transform:uppercase}
+  .circuit-meta b{display:block;font-family:var(--mono);font-size:9px;font-weight:400;color:var(--tert);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* All-time champions ------------------------------------------------------- */
+  #championsView{padding:8px;min-width:0}
+  .champ-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;padding:2px 2px 10px}
+  .champ-head h2{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;margin:0}
+  .champ-head h2 span{font-size:9px;color:var(--sec);letter-spacing:.06em;margin-left:8px}
+  .champ-search{display:flex;flex-direction:column;gap:3px;min-width:220px;flex:0 1 300px}
+  .champ-search span{font-family:var(--mono);font-size:8px;letter-spacing:.08em;color:var(--sec);text-transform:uppercase}
+  .champ-search input{width:100%;background:var(--bg);border:1px solid var(--hair);border-radius:0;padding:6px 8px;font-family:var(--mono);font-size:10px;color:var(--fg)}
+  .champ-search input::placeholder{color:var(--sec)}
+  .champ-grid{border:1px solid var(--hair);background:var(--panel);min-width:0}
+  .champ-row{display:grid;grid-template-columns:64px minmax(0,1.65fr) minmax(0,1.05fr) 86px 62px minmax(0,1.3fr) 96px;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--hair);min-width:0}
+  .champ-row:last-child{border-bottom:0}
+  .champ-row[data-team-color]{border-left:2px solid var(--team,var(--hair))}
+  .champ-hdr{font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--sec)}
+  .champ-hdr > div{white-space:nowrap}
+  .champ-data{font-family:var(--mono);font-size:10px;color:var(--tert);min-width:0}
+  .champ-data > *{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .champ-year{font-size:12px;color:var(--fg)}
+  .champ-driver{display:flex;align-items:center;gap:7px;min-width:0}
+  .champ-driver .cwho{min-width:0}
+  .champ-driver .cname{display:block;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .champ-driver .cmeta{display:block;font-size:8px;color:var(--sec);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .team-mark{display:inline-block;width:3px;height:14px;flex:none;background:var(--team,var(--sec));border:1px solid var(--hair)}
+  .champ-team{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .team-chip{display:inline-block;max-width:100%;padding:1px 5px;background:var(--team,var(--hair));color:var(--team-text,var(--fg));border:1px solid var(--hair);font-family:var(--mono);font-size:8px;line-height:1.35;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+  .champ-num{text-align:right}
+  .champ-action{text-align:right}
+  .champ-action .btn{padding:4px 6px;font-size:8px}
+  .champ-empty{padding:24px 10px;text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--sec)}
+  .champ-note{padding:8px 2px;font-size:10px;line-height:1.5;color:var(--sec)}
+  .champ-note b{color:var(--tert);font-weight:500}
 
   @media (max-width:1180px){
     main{grid-template-columns:330px minmax(0,1fr)}
@@ -226,8 +289,20 @@
     .tower-wrap{max-height:360px}
     .feed-wrap{max-height:320px}
     .evidence{grid-template-columns:1fr}
+    .champ-row{grid-template-columns:54px minmax(0,1.6fr) minmax(0,1fr) 74px 54px minmax(0,1.2fr) 88px;gap:5px;padding:7px}
   }
   @media (max-width:700px){
+    .champ-hdr{display:none}
+    .champ-row{grid-template-columns:minmax(0,1fr) minmax(0,auto);gap:2px 8px;padding:8px}
+    .champ-row .champ-year{grid-column:1;grid-row:1}
+    .champ-row .champ-action{grid-column:2;grid-row:1}
+    .champ-row .champ-driver{grid-column:1/-1;grid-row:2}
+    .champ-row .champ-team{grid-column:1;grid-row:3}
+    .champ-row .champ-points{grid-column:2;grid-row:3;text-align:right}
+    .champ-row .champ-wins{grid-column:1;grid-row:4}
+    .champ-row .champ-constructor{grid-column:1/-1;grid-row:5}
+    .champ-head h2{font-size:11px;letter-spacing:.08em}
+    .focus-badge .fname{display:none}
     .chart-grid{grid-template-columns:1fr}
     .brand-block{min-width:0;flex:1 1 100%}
     .selectors{max-width:none;flex:1 1 100%}
@@ -252,6 +327,8 @@
     .uc-body{padding:8px}
     .prob-bars{padding-left:8px;padding-right:8px}
     .tower td,.tower th{padding-left:4px;padding-right:4px}
+    #championsView{padding:6px}
+    .champ-search{min-width:0;flex:1 1 100%}
   }
 </style>
 </head>
@@ -262,6 +339,11 @@
       <div class="brand">PIT WALL</div>
       <div class="sub">F1 strategy replay · <span id="metaLine">loading</span></div>
     </div>
+    <nav class="viewbar" aria-label="View">
+      <button id="viewReplayBtn" class="btn active" data-view="replay" aria-pressed="true">REPLAY CONSOLE</button>
+      <button id="viewChampsBtn" class="btn" data-view="champions" aria-pressed="false">CHAMPIONS</button>
+    </nav>
+    <div id="focusBadge" class="focus-badge" aria-live="polite"></div>
     <div class="selectors">
       <label class="sel season"><span>SEASON</span><select id="seasonSel" aria-label="Season"></select></label>
       <label class="sel race"><span>RACE</span><select id="raceSel" aria-label="Race"></select></label>
@@ -290,6 +372,11 @@
 
 <main id="main" hidden>
   <aside class="col left">
+    <section class="panel" id="circuitCard">
+      <div class="panel-head"><h2>Circuit layout</h2><span class="tag" id="circuitTag">—</span></div>
+      <div class="circuit-body" id="circuitBody"></div>
+      <div class="circuit-meta" id="circuitMeta"></div>
+    </section>
     <section class="panel">
       <div class="panel-head"><h2>Timing tower</h2><span class="tag" id="towerMeta">LAP —</span></div>
       <div class="tower-wrap">
@@ -377,6 +464,22 @@
   </aside>
 </main>
 
+<section id="championsView" hidden>
+  <div class="champ-head">
+    <h2>All-time world champions <span id="champCount"></span></h2>
+    <label class="champ-search"><span>Filter by year, driver or constructor</span><input id="champSearch" type="search" placeholder="2011 · Vettel · Red Bull" autocomplete="off" aria-label="Filter champions"></label>
+  </div>
+  <div class="champ-grid" role="table" aria-label="All-time Formula 1 world champions">
+    <div class="champ-row champ-hdr" role="row">
+      <div role="columnheader">Year</div><div role="columnheader">Driver champion</div><div role="columnheader">Team</div>
+      <div role="columnheader" class="champ-num">Points / margin</div><div role="columnheader" class="champ-num">Wins</div>
+      <div role="columnheader">Constructor champion</div><div role="columnheader" class="champ-action">Lap data</div>
+    </div>
+    <div id="champRows"></div>
+  </div>
+  <div class="champ-note">Final standings from the CSV archive, 1950–2026. Pre-1958 seasons have no Constructors' Championship. <b>OPEN REPLAY</b> jumps to that season's finale in the lap-by-lap console; seasons without lap data stay read-only.</div>
+</section>
+
 <section class="evidence" id="evidence" hidden>
   <article class="panel ev" id="evPit">
     <div class="panel-head"><h2>Pit loss by circuit</h2><span class="tag" id="pitCardTag">IQR · N≥15</span></div>
@@ -436,11 +539,55 @@ const fmtLap = (ms) => {
 };
 const fmtSigned = (x, nd = 2) => {
   if (!isFinite(x)) return '—';
-  return `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(nd)}`;
+  const v = Number(x.toFixed(nd));
+  return `${v > 0 ? '+' : v < 0 ? '-' : ''}${Math.abs(v).toFixed(nd)}`;
 };
 const fmtSec = (x, nd = 2) => isFinite(x) ? `${x.toFixed(nd)} s` : '—';
 const fmtPct = (x) => isFinite(x) ? `${(x * 100).toFixed(1)}` : '—';
 const trunc = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+// A missing file or a failed decode degrades to the same crisp monogram badge.
+window.addEventListener('error', (ev) => {
+  const img = ev.target;
+  if (!img || !img.classList || !img.classList.contains('driver-img')) return;
+  const badge = document.createElement('span');
+  badge.className = img.className.replace(/driver-img/g, '') + ' mono-badge';
+  badge.textContent = img.dataset.code || '';
+  if (img.parentNode) img.parentNode.replaceChild(badge, img);
+}, true);
+function driverBadge(meta, cls = '') {
+  const code = esc((meta && meta.code) || '—');
+  if (meta && meta.has_img && meta.driverRef) {
+    const src = `assets/drivers/${encodeURIComponent(meta.driverRef)}.png`;
+    return `<img class="driver-img ${cls}" src="${esc(src)}" data-code="${code}" alt="">`;
+  }
+  return `<span class="mono-badge ${cls}">${code}</span>`;
+}
+
+// Original constructor colours come from data/index.json. Unknown teams use a
+// neutral grey rather than a desaturated team colour.
+const FALLBACK_TEAM = '#8A8A8A';
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+function teamColor(value) {
+  return HEX_COLOR.test(String(value || '')) ? String(value).toUpperCase() : FALLBACK_TEAM;
+}
+function teamText(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.55 ? '#000' : '#fff';
+}
+function teamAttrs(hex, variable = '--team') {
+  const c = teamColor(hex);
+  return { style: `${variable}:${c}`, 'data-team-color': c };
+}
+function htmlTeamAttrs(hex, variable = '--team') {
+  const a = teamAttrs(hex, variable);
+  return `style="${a.style}" data-team-color="${a['data-team-color']}"`;
+}
+function teamChip(name, hex) {
+  const c = teamColor(hex);
+  return `<span class="team-chip" style="--team:${c};--team-text:${teamText(c)}" data-team-color="${c}">${esc(name)}</span>`;
+}
 
 const state = {
   index: null,
@@ -459,6 +606,8 @@ const state = {
   timer: null,
   uc: { dirty: false, live: null, params: null, result: null },
   theme: 'dark',
+  view: 'replay',
+  champFilter: '',
   evidenceDirty: true,
   resizeQueued: false,
 };
@@ -799,8 +948,8 @@ function renderTower() {
     const age = ageAt(d, lap);
     const p = d.prob[lap] || 0;
     const title = `${d.meta.code} · ${d.meta.name} · ${d.team}`;
-    rows.push(`<tr class="${d.id === state.focusId ? 'focus' : ''}" data-id="${d.id}" tabindex="0" title="${esc(title)}" aria-label="${esc(title)}">
-      <td class="p">${d.pos[lap - 1]}</td><td class="code">${esc(d.meta.code)}</td><td class="gap" data-gap="${gap.toFixed(9)}">${gapText}</td>
+    rows.push(`<tr class="${d.id === state.focusId ? 'focus' : ''}" data-id="${d.id}" ${htmlTeamAttrs(d.meta.color)} tabindex="0" title="${esc(title)}" aria-label="${esc(title)}">
+      <td class="p">${d.pos[lap - 1]}</td><td class="code"><span class="driver-cell">${driverBadge(d.meta)}<span class="dcode">${esc(d.meta.code)}</span></span></td><td class="gap" data-gap="${gap.toFixed(9)}">${gapText}</td>
       <td class="dim">${intText}</td><td class="dim">${fmtLap(d.laps[lap - 1])}</td><td class="tyre" title="Tyre age in laps; compounds are not in the data">${age == null ? '—' : age}</td>
       <td class="win" data-p="${p.toFixed(12)}">${fmtPct(p)}</td></tr>`);
   }
@@ -831,7 +980,7 @@ function renderProbs() {
   $('probBars').innerHTML = order.map((d) => {
     const p = d.prob[lap] || 0;
     const cls = d.id === state.focusId ? 'focus' : d.id === state.aheadId ? 'ahead' : 'other';
-    return `<div class="prob-row ${cls}" data-id="${d.id}" title="${esc(d.meta.code + ' · ' + d.meta.name + ' · ' + d.team)}"><span class="code">${esc(d.meta.code)}</span><span class="prob-track"><span class="prob-fill" style="width:${(p * 100).toFixed(3)}%"></span></span><span class="pct" data-p="${p.toFixed(12)}">${fmtPct(p)}</span></div>`;
+    return `<div class="prob-row ${cls}" data-id="${d.id}" ${htmlTeamAttrs(d.meta.color)} title="${esc(d.meta.code + ' · ' + d.meta.name + ' · ' + d.team)}"><span class="code">${esc(d.meta.code)}</span><span class="prob-track"><span class="prob-fill" style="width:${(p * 100).toFixed(3)}%"></span></span><span class="pct" data-p="${p.toFixed(12)}">${fmtPct(p)}</span></div>`;
   }).join('');
   $('probMeta').textContent = `LAP ${lap} · ${order.length} CARS`;
   const focus = focusDriver();
@@ -960,7 +1109,11 @@ function renderUcCurve(result, params) {
   add(svg, svgEl('text', { class: 'axis-label', x: plot.x - 4, y: y(0) + 2.5, 'text-anchor': 'end' }, '0'));
   add(svg, svgEl('text', { class: 'axis-label', x: plot.x + plot.w, y: plot.y + plot.h + 12, 'text-anchor': 'end' }, `${result.maxGap.toFixed(0)} s gap`));
   add(svg, svgEl('text', { class: 'axis-label', x: plot.x, y: plot.y + plot.h + 12, 'text-anchor': 'start' }, '0'));
-  add(svg, svgEl('path', { class: 'series-focus', d: pathFor(result.curve.map(([g, p]) => [x(g), y(p)])) }));
+  add(svg, svgEl('path', {
+    class: 'series-focus',
+    d: pathFor(result.curve.map(([g, p]) => [x(g), y(p)])),
+    ...teamAttrs(state.uc.live ? state.uc.live.chaser.meta.color : null, '--series'),
+  }));
   const cx = x(clamp(params.gap, 0, result.maxGap));
   add(svg, svgEl('line', { class: 'now-line', x1: cx, x2: cx, y1: plot.y, y2: plot.y + plot.h }));
   add(svg, svgEl('rect', { class: 'uc-dot', x: cx - 2, y: y(result.p) - 2, width: 4, height: 4 }));
@@ -1085,19 +1238,19 @@ function drawLapChart() {
   for (const d of others) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (d.pos[l - 1] != null) pts.push([x(l), y(d.pos[l - 1])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts), ...teamAttrs(d.meta.color, '--series') }));
   }
   const ahead = aheadDriver();
   if (ahead) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) if (ahead.pos[l - 1] != null) pts.push([x(l), y(ahead.pos[l - 1])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts), ...teamAttrs(ahead.meta.color, '--series') }));
   }
   const focus = focusDriver();
   if (focus) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) if (focus.pos[l - 1] != null) pts.push([x(l), y(focus.pos[l - 1])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts), ...teamAttrs(focus.meta.color, '--series') }));
   }
   const order = orderAt(sim, state.lap);
   const labels = [];
@@ -1141,19 +1294,19 @@ function drawGapChart() {
   for (const d of others) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isFinite(d.gap[l])) pts.push([x(l), y(d.gap[l])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts), ...teamAttrs(d.meta.color, '--series') }));
   }
   const ahead = aheadDriver();
   if (ahead) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) if (isFinite(ahead.gap[l])) pts.push([x(l), y(ahead.gap[l])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts), ...teamAttrs(ahead.meta.color, '--series') }));
   }
   const focus = focusDriver();
   if (focus) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) if (isFinite(focus.gap[l])) pts.push([x(l), y(focus.gap[l])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts), ...teamAttrs(focus.meta.color, '--series') }));
   }
   const order = orderAt(sim, state.lap);
   const labels = [];
@@ -1214,7 +1367,7 @@ function drawPaceChart() {
     if (!d) return;
     const pts = [];
     for (let l = 1; l <= state.lap && l <= d.lastLap; l++) if (isClean(d, l)) pts.push([x(l), y(d.laps[l - 1])]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: cls, d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: cls, d: pathFor(pts), ...teamAttrs(d.meta.color, '--series') }));
   };
   drawSeries(ahead, 'series-ahead');
   drawSeries(focus, 'series-focus');
@@ -1241,8 +1394,8 @@ function drawPaceChart() {
           for (let l = stint[0]; l <= Math.min(state.lap, stint[1]); l++) {
             if (focus.age[l] != null) linePts.push([x(l), y((a + b * focus.age[l]) * 1000)]);
           }
-          if (linePts.length > 1) add(svg, svgEl('path', { class: 'ols-line', d: pathFor(linePts) }));
-          olsText = `${fmtSigned(b, 3)} s/lap · n=${n}`;
+          if (linePts.length > 1) add(svg, svgEl('path', { class: 'ols-line', d: pathFor(linePts), ...teamAttrs(focus.meta.color, '--series') }));
+          olsText = `${fmtSigned(b, 4)} s/lap · n=${n}`;
         }
       }
     }
@@ -1289,7 +1442,14 @@ function drawStrategyChart() {
       if (isFocus) cls = 'stint-focus';
       else if (isAhead) cls = 'stint-ahead';
       else cls = s % 2 ? 'stint-other-odd' : 'stint-other-even';
-      add(svg, svgEl('rect', { class: cls, x: Math.max(plot.x, x1), y: yy - barH / 2, width: Math.max(1, Math.min(x2, plot.x + plot.w) - Math.max(plot.x, x1)), height: barH }));
+      add(svg, svgEl('rect', {
+        class: cls,
+        x: Math.max(plot.x, x1),
+        y: yy - barH / 2,
+        width: Math.max(1, Math.min(x2, plot.x + plot.w) - Math.max(plot.x, x1)),
+        height: barH,
+        ...teamAttrs(d.meta.color),
+      }));
     }
     for (const [pl] of d.pits) {
       if (pl > state.lap) continue;
@@ -1324,19 +1484,19 @@ function drawProbChart() {
   for (const d of others) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= d.lastLap; l++) pts.push([x(l), y(d.prob[l] || 0)]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-other', d: pathFor(pts), ...teamAttrs(d.meta.color, '--series') }));
   }
   const ahead = aheadDriver();
   if (ahead) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= ahead.lastLap; l++) pts.push([x(l), y(ahead.prob[l] || 0)]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-ahead', d: pathFor(pts), ...teamAttrs(ahead.meta.color, '--series') }));
   }
   const focus = focusDriver();
   if (focus) {
     const pts = [];
     for (let l = 1; l <= state.lap && l <= focus.lastLap; l++) pts.push([x(l), y(focus.prob[l] || 0)]);
-    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts) }));
+    if (pts.length > 1) add(svg, svgEl('path', { class: 'series-focus', d: pathFor(pts), ...teamAttrs(focus.meta.color, '--series') }));
   }
   const order = orderAt(sim, state.lap);
   const labels = [];
@@ -1499,6 +1659,39 @@ function renderCharts() {
   drawProbChart();
 }
 
+function renderFocusBadge() {
+  const d = focusDriver();
+  if (!d) { $('focusBadge').innerHTML = '<span class="tag">NO FOCUS CAR</span>'; return; }
+  const meta = d.meta;
+  $('focusBadge').innerHTML = `${driverBadge(meta)}<span>${esc(meta.code)}</span><span class="fname">${esc(meta.name)}</span>`;
+}
+
+function renderCircuit() {
+  const cid = String(state.race.circuitId);
+  const layout = state.index.circuitLayouts && state.index.circuitLayouts[cid];
+  const era = layout && layout.eras && layout.eras.find((e) => state.year >= e.from && state.year <= e.to);
+  const chosen = era || layout;
+  const stats = (state.index.circuits || []).find((c) => c.id === state.race.circuitId);
+  $('circuitTag').textContent = `R${String(state.race.round).padStart(2, '0')} · ${state.year}`;
+  if (!chosen || layout.fallback || !chosen.svg_path) {
+    $('circuitBody').innerHTML = '<div class="circuit-fallback" id="circuitFallback">LAYOUT UNAVAILABLE</div>';
+  } else {
+    const tick = chosen.sf_line || [];
+    const sf = tick.length === 4
+      ? `<line class="circuit-sf" x1="${tick[0]}" y1="${tick[1]}" x2="${tick[2]}" y2="${tick[3]}"/>`
+      : '';
+    $('circuitBody').innerHTML =
+      `<svg id="circuitSvg" class="circuit-layout" viewBox="0 0 220 130" role="img" aria-label="${esc(chosen.name || layout.name)} circuit layout">` +
+      `<path id="circuitPath" class="circuit-track" d="${esc(chosen.svg_path)}"/>${sf}</svg>`;
+  }
+  const loss = stats && stats.med ? `${stats.med.toFixed(2)} s (n=${stats.n})` : '—';
+  $('circuitMeta').innerHTML =
+    `<div><span>Circuit</span><b title="${esc((chosen && chosen.name) || (layout && layout.name) || state.race.circuit)}">${esc((chosen && chosen.name) || (layout && layout.name) || state.race.circuit)}</b></div>` +
+    `<div><span>Country</span><b>${esc((layout && layout.country) || stats?.country || '—')}</b></div>` +
+    `<div><span>Round / laps</span><b>R${state.race.round} · ${state.race.laps}</b></div>` +
+    `<div><span>Median pit loss</span><b>${loss}</b></div>`;
+}
+
 function renderAll() {
   if (!state.sim) return;
   ensureFocus();
@@ -1508,12 +1701,76 @@ function renderAll() {
   $('scrub').value = String(state.lap);
   $('playBtn').textContent = state.playing ? 'PAUSE' : 'PLAY';
   $('metaLine').textContent = `${state.year} · ${state.race.name} · ${state.race.circuit}`;
+  renderFocusBadge();
+  renderCircuit();
   renderTower();
   renderFeed();
   renderProbs();
   renderUndercut();
   renderCharts();
   renderEvidence();
+}
+
+function setView(view, updateHash = true) {
+  const next = view === 'champions' ? 'champions' : 'replay';
+  state.view = next;
+  document.body.dataset.view = next;
+  const replay = next === 'replay';
+  $('main').hidden = !replay;
+  $('evidence').hidden = !replay;
+  $('footer').hidden = !replay;
+  $('championsView').hidden = replay;
+  $('viewReplayBtn').classList.toggle('active', replay);
+  $('viewChampsBtn').classList.toggle('active', !replay);
+  $('viewReplayBtn').setAttribute('aria-pressed', String(replay));
+  $('viewChampsBtn').setAttribute('aria-pressed', String(!replay));
+  if (updateHash && location.hash.slice(1) !== next) history.replaceState(null, '', `#${next}`);
+  if (!replay) renderChampions();
+}
+
+function championRow(c) {
+  const d = c.driver || {}, con = c.constructor || {};
+  const points = d.points == null ? '—' : `${d.points}`;
+  const margin = d.margin == null ? '—' : `+${d.margin}`;
+  const wins = d.wins == null ? '—' : `${d.wins}`;
+  const podiums = d.podiums == null ? '' : ` · ${d.podiums} pod`;
+  const conText = con.name ? `${con.name}${con.points == null ? '' : ` · ${con.points} pts`}` : '—';
+  const driverColor = teamColor(d.color);
+  const conColor = teamColor(con.color || d.color);
+  const conChip = con.name ? teamChip(conText, conColor) : '<span class="tag">—</span>';
+  const action = c.has_replay && c.default_race_id
+    ? `<button class="btn" data-open-year="${c.year}" data-open-race="${c.default_race_id}">OPEN REPLAY</button>`
+    : '<span class="tag">NO LAP DATA</span>';
+  return `<div class="champ-row champ-data" role="row" ${htmlTeamAttrs(driverColor)}>
+    <div class="champ-year" role="cell">${c.year}</div>
+    <div class="champ-driver" role="cell">${driverBadge({ code: d.code, driverRef: d.driverRef, has_img: d.has_img }, 'portrait-champ')}<span class="cwho"><b class="cname">${esc(d.name || '—')}</b><span class="cmeta">${esc(d.code || '')}${d.nationality ? ' · ' + esc(d.nationality) : ''}</span></span></div>
+    <div class="champ-team" role="cell" title="${esc(d.constructor || '')}"><span class="team-mark" style="--team:${driverColor}" data-team-color="${driverColor}"></span>${esc(d.constructor || '—')}</div>
+    <div class="champ-points champ-num" role="cell" title="Championship points and margin over the runner-up">${esc(points)} <span class="tag">/ ${esc(margin)}</span></div>
+    <div class="champ-wins champ-num" role="cell" title="Season wins and podiums">${esc(wins)}${esc(podiums)}</div>
+    <div class="champ-constructor" role="cell" title="${esc(conText)}">${conChip}</div>
+    <div class="champ-action" role="cell">${action}</div>
+  </div>`;
+}
+
+function renderChampions() {
+  if (!state.index || !state.index.champions) return;
+  const q = state.champFilter.trim().toLowerCase();
+  const all = state.index.champions;
+  const rows = q ? all.filter((c) => {
+    const d = c.driver || {}, con = c.constructor || {};
+    return [c.year, d.name, d.code, d.constructor, con.name].some((v) => String(v || '').toLowerCase().includes(q));
+  }) : all;
+  $('champCount').textContent = `${rows.length} / ${all.length} SEASONS`;
+  $('champRows').innerHTML = rows.length
+    ? rows.map(championRow).join('')
+    : '<div class="champ-empty">NO SEASONS MATCH THIS FILTER</div>';
+}
+
+async function openChampionReplay(year, raceId) {
+  pause();
+  setView('replay');
+  await changeSeason(Number(year));
+  if (raceId) await loadRace(Number(raceId), 1, null);
 }
 
 function pause() {
@@ -1642,6 +1899,17 @@ async function boot() {
     document.querySelectorAll('.speed').forEach((b) => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
     $('seasonSel').addEventListener('change', (e) => changeSeason(e.target.value).catch(bootError));
     $('raceSel').addEventListener('change', (e) => changeRace(e.target.value).catch(bootError));
+    document.querySelectorAll('.viewbar .btn').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+    window.addEventListener('hashchange', () => {
+      const next = location.hash === '#champions' ? 'champions' : 'replay';
+      if (next !== state.view) setView(next, false);
+    });
+    $('champSearch').addEventListener('input', (e) => { state.champFilter = e.target.value; renderChampions(); });
+    $('champRows').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-open-year]');
+      if (btn) openChampionReplay(Number(btn.dataset.openYear), Number(btn.dataset.openRace)).catch(bootError);
+    });
+    setView(location.hash === '#champions' ? 'champions' : 'replay', location.hash !== '#champions');
     $('themeBtn').addEventListener('click', () => {
       state.theme = state.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.dataset.theme = state.theme;
@@ -1729,9 +1997,11 @@ async function boot() {
         }
         return out;
       },
+      view: () => state.view,
       go: (lap) => { pause(); goToLap(lap); },
       play: () => play(),
       pause: () => pause(),
+      openRace: (year, raceId, lap = 1, focusId = null) => changeSeason(year).then(() => loadRace(raceId, lap, focusId)),
     };
   } catch (err) {
     bootError(err);

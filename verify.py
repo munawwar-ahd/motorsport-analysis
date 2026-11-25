@@ -4,7 +4,9 @@ Recomputes the default race/lap features and win probabilities from the raw
 CSV archive, then compares them with the values the page reports through
 window.PITWALL.debug(). Also spot-checks one pit loss, the Shanghai circuit
 pit-loss median at race 843, and the 2011 Chinese GP tyre-wear slope with a
-full driver-dummy OLS.
+full driver-dummy OLS. Finally validates the champions table, original
+constructor hex colours, every replay circuit layout and every local driver
+portrait (including that RGB colour channels were preserved).
 
 Run:  python verify.py
 """
@@ -13,16 +15,19 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent
 YEAR = 2011
 RID = 843
 LAP = 31
 TOL = 1e-6
+HEX_COLOR = re.compile(r"^#[0-9A-F]{6}$")
 
 
 def read_csv(name: str) -> pd.DataFrame:
@@ -209,6 +214,129 @@ def tyre_slope(lap_times, pits, rid):
     }
 
 
+def verify_champions_layouts_portraits(index: dict) -> None:
+    """Independent checks for the three new offline assets in index.json."""
+    races_all = read_csv("races.csv")
+    drivers_all = read_csv("drivers.csv")
+    years = sorted(int(y) for y in races_all.year.unique())
+    champions = index.get("champions", [])
+    by_year = {int(c["year"]): c for c in champions}
+    missing = [y for y in years if y not in by_year]
+    assert not missing, f"champions missing seasons: {missing}"
+    bad = []
+    constructor_refs = {str(r.constructorRef) for r in constructors_all.itertuples(index=False)}
+    color_map = index.get("constructorColors") or {}
+    if set(color_map) != constructor_refs:
+        bad.append("constructorColors does not cover every constructors.csv ref")
+    for ref, color in color_map.items():
+        if not isinstance(color, str) or not HEX_COLOR.fullmatch(color):
+            bad.append(f"constructorColors[{ref}]: invalid hex {color!r}")
+    replay_years = {int(s["year"]): s for s in index["seasons"]}
+    for year, row in by_year.items():
+        d = row.get("driver") or {}
+        con = row.get("constructor") or {}
+        if year not in years:
+            bad.append(f"{year}: unknown season")
+        if not all(d.get(k) is not None for k in ("driverId", "driverRef", "code", "name", "points", "wins", "podiums", "margin")):
+            bad.append(f"{year}: incomplete champion driver")
+        if year >= 1958 and not all(con.get(k) is not None for k in ("constructorId", "name", "points", "wins")):
+            bad.append(f"{year}: incomplete champion constructor")
+        if year < 1958 and con:
+            bad.append(f"{year}: constructor champion before 1958")
+        if row.get("has_replay") != (year in replay_years):
+            bad.append(f"{year}: has_replay mismatch")
+        if year in replay_years:
+            race_ids = {int(r["id"]) for r in replay_years[year]["races"]}
+            if row.get("default_race_id") not in race_ids:
+                bad.append(f"{year}: default_race_id not in replay set")
+    assert not bad, "champion records / colours: " + "; ".join(bad[:12])
+    expected = {
+        "ferrari": "#E8002D", "red_bull": "#3671C6", "mercedes": "#27F4D2",
+        "mclaren": "#FF8000", "aston_martin": "#229971", "alpine": "#00A1E8",
+        "williams": "#1868DB", "rb": "#6692FF", "alphatauri": "#2B4562",
+        "toro_rosso": "#469BFF", "sauber": "#52E252", "alfa": "#C92D4B",
+        "haas": "#B6BABD", "audi": "#F50537", "cadillac": "#909090",
+        "renault": "#FFF500", "racing_point": "#F596C8", "force_india": "#FF5F0F",
+        "team_lotus": "#FFB800", "brawn": "#B8FD6E", "jordan": "#EED202",
+        "benetton": "#00A86B", "brabham": "#002855", "tyrrell": "#003399",
+        "matra": "#0055A4", "cooper": "#004225", "brm": "#004225",
+        "vanwall": "#006633", "maserati": "#C8102E",
+    }
+    wrong = [f"{ref}: {color_map.get(ref)} != {hex}" for ref, hex in expected.items() if color_map.get(ref) != hex]
+    assert not wrong, "original constructor colours: " + "; ".join(wrong[:12])
+    print(f"\nChampions: {len(champions)} seasons ({years[0]}-{years[-1]}), "
+          f"{sum(1 for c in champions if c.get('constructor'))} constructor champions, "
+          f"{sum(1 for c in champions if c.get('has_replay'))} with replay data")
+    print(f"Constructor colours: {len(color_map)} refs mapped, "
+          f"{sum(1 for c in champions if c.get('constructor'))} champion badges coloured")
+
+    layouts = index.get("circuitLayouts", {})
+    replay_circuits = set()
+    for season in index["seasons"]:
+        for race in season["races"]:
+            replay_circuits.add(int(race["circuitId"]))
+    missing_layouts = []
+    point_counts = []
+    era_count = 0
+    for cid in sorted(replay_circuits):
+        entry = layouts.get(str(cid))
+        if not entry:
+            missing_layouts.append(f"{cid}: no entry")
+            continue
+        path = entry.get("svg_path") or ""
+        if not entry.get("fallback") and (not path.startswith("M") or not path.endswith("Z") or len(path) < 200):
+            missing_layouts.append(f"{cid}: empty svg_path")
+            continue
+        if not entry.get("fallback") and len(entry.get("sf_line") or []) != 4:
+            missing_layouts.append(f"{cid}: missing sf_line")
+        point_counts.append(len(path.split(" L")) if path else 0)
+        era_count += len(entry.get("eras") or [])
+        for era in entry.get("eras") or []:
+            if era.get("from", 9999) > era.get("to", 0):
+                missing_layouts.append(f"{cid}: invalid era range")
+    assert not missing_layouts, "circuit layouts: " + "; ".join(missing_layouts[:12])
+    print(f"Circuit layouts: {len(replay_circuits)} replay circuits, "
+          f"{sum(1 for c in replay_circuits if not layouts[str(c)]['fallback'])} with geometry, "
+          f"{era_count} era-specific variants; {min(point_counts)}-{max(point_counts)} points per track")
+
+    ref_of = {int(r.driverId): str(r.driverRef) for r in drivers_all.itertuples(index=False)}
+    refs = set()
+    for season in index["seasons"]:
+        data = json.loads((ROOT / "data" / f"s{season['year']}.json").read_text(encoding="utf-8"))
+        for driver_id, meta in data["drivers"].items():
+            if meta.get("has_img"):
+                refs.add(ref_of[int(driver_id)])
+    for row in champions:
+        d = row.get("driver") or {}
+        if d.get("has_img"):
+            refs.add(str(d["driverRef"]))
+    broken = []
+    colorful = 0
+    for ref in sorted(refs):
+        path = ROOT / "assets" / "drivers" / f"{ref}.png"
+        if not path.is_file():
+            broken.append(f"{ref}: missing")
+            continue
+        try:
+            with Image.open(path) as img:
+                if img.format != "PNG" or img.size != (160, 160) or img.mode != "RGBA":
+                    broken.append(f"{ref}: {img.format} {img.size} {img.mode}")
+                arr = np.asarray(img.convert("RGBA"))
+                rgb = arr[..., :3].astype(np.int16)
+                spread = rgb.max(axis=2) - rgb.min(axis=2)
+                if np.any((spread > 12) & (arr[..., 3] > 0)):
+                    colorful += 1
+        except Exception as exc:
+            broken.append(f"{ref}: {exc}")
+    assert not broken, "portraits: " + "; ".join(broken[:12])
+    assert colorful > len(refs) / 2, f"portraits appear greyscale: only {colorful}/{len(refs)} have colour pixels"
+    on_disk = len(list((ROOT / "assets" / "drivers").glob("*.png")))
+    assert on_disk == index.get("driverImages", {}).get("count"), "driverImages.count mismatch"
+    print(f"Driver portraits: {len(refs)} referenced refs valid 160x160 RGBA PNG; {on_disk} files on disk")
+    print(f"Portrait colour: {colorful}/{len(refs)} contain real RGB colour pixels (no greyscale conversion)")
+    print("PASS: champions, original team colours, layouts and full-colour portraits are valid")
+
+
 def main():
     lap_times = read_csv("lap_times.csv")
     pits = read_csv("pit_stops.csv")
@@ -343,6 +471,8 @@ def main():
         print(f"  {name:9s} log-loss {row['logloss']:.6f}  Brier {row['brier']:.6f}  accuracy {row['accuracy'] * 100:.4f}%")
     assert m["model"]["logloss"] < m["position"]["logloss"]
     print("PASS: full model beats the position-only baseline on held-out log-loss")
+
+    verify_champions_layouts_portraits(index)
 
     size = sum(p.stat().st_size for p in (ROOT / "data").glob("*.json"))
     print(f"\nData folder: {size / 1024 / 1024:.2f} MiB in {len(list((ROOT / 'data').glob('*.json')))} JSON files")
